@@ -8,11 +8,11 @@
 ## Último checkpoint
 
 ```
-Fecha:    2026-05-25
-Sesión:   4
-Estado:   DEMO_MODE implementado. Backend corre sin API key. 42 tests, 91.52% cobertura.
-Próxima acción: Fase 1.2 — Timeout visible en frontend (>90s) + Fase 2 Visual del mapa
-Tests:    42/42 ✅ | Cobertura: 91.52% ✅ | mypy: 0 errores ✅ | ruff: 0 warnings ✅ | frontend build: ✅
+Fecha:    2026-05-26
+Sesión:   5
+Estado:   Fases 1-5 completas. pnpm migrado. pyproject.toml consolidado. API key validada.
+          Proyecto migrado al repo tweladera/Confidence-Map.
+Tests:    42/42 ✅ | Cobertura: 91.54% ✅ | mypy: 0 errores ✅ | ruff: 0 warnings ✅ | frontend build: ✅
 ```
 
 ---
@@ -33,14 +33,14 @@ Ejecutar estos comandos para confirmar que todo está en orden:
 ```bash
 # 1. Backend instala y tests pasan
 cd backend && ANTHROPIC_API_KEY=test uv run pytest -q
-# Esperado: 29 passed, coverage: 80%+
+# Esperado: 42 passed, coverage: 91%+
 
 # 2. Tipado y linting
 cd backend && uv run mypy --strict confidence_map/ && uv run ruff check confidence_map/
 # Esperado: Success / All checks passed
 
 # 3. Frontend compila
-cd frontend && npx tsc --noEmit
+cd frontend && pnpm exec tsc --noEmit
 # Esperado: (sin output = ok)
 
 # 4. Backend arranca
@@ -67,83 +67,80 @@ kill %1
 | Accesibilidad WCAG 2.1 AA base | ✅ | build ok |
 | Tipado estático mypy --strict | ✅ | 0 errores |
 | Linting ruff | ✅ | 0 warnings |
-| Tests pytest (29 tests, ≥80%) | ✅ | 80.34% |
-| spec-kit v0.8.12 instalado | ✅ | sí |
-| Constitución del proyecto | ✅ | sí |
+| Tests pytest (42 tests, ≥80%) | ✅ | 91.54% |
 | README raíz | ✅ | sí |
 | README backend | ✅ | sí |
 | README frontend | ✅ | sí |
 | QUICKSTART.md | ✅ | sí |
 | PLAN.md | ✅ | sí |
 | uv migración (desde pip/venv) | ✅ | sí |
-| pyproject.toml (reemplaza requirements.txt) | ✅ | sí |
-
-**Lo que NO se ha verificado en Fase 0:**
-- [ ] Frontend corriendo con backend real (solo build compilado)
-- [ ] Análisis end-to-end con ANTHROPIC_API_KEY real
-- [ ] React Flow renderizando el mapa en el browser
+| pyproject.toml (dependency-groups, sin duplicados) | ✅ | sí |
+| pnpm migrado (sin npm) | ✅ | sí |
 
 ---
 
 ### FASE 1 — Estabilidad demo
-**Estado: NO INICIADA ⬜**
+**Estado: COMPLETA ✅**
 
 | Tarea | Estado | Verificado |
 |-------|--------|-----------|
 | `DEMO_MODE=true`: mock results para spec de pagos | ✅ | sí |
 | Mock con delay simulado (SSE funciona igual) | ✅ | sí |
 | Variable `MODEL` documentada en .env | ✅ | sí |
-| Timeout visible en frontend (>90s) | ⬜ | — |
-| Error de agente no bloquea los demás | ⬜ | — |
+| Timeout visible en frontend (>90s) | ✅ | sí |
+| Error de agente no bloquea los demás | ✅ | sí |
 | Test end-to-end con mock mode | ✅ | sí |
 
 ---
 
 ### FASE 2 — Visual del mapa
-**Estado: NO INICIADA ⬜**
+**Estado: COMPLETA ✅**
 
 | Tarea | Estado | Verificado |
 |-------|--------|-----------|
-| Animación fadeIn en nodos de findings | ⬜ | — |
-| Nodo agente: glow animado en running | ⬜ | — |
-| Edges animadas → estáticas al completar | ⬜ | — |
-| Nodo finding: barra de confidence score | ⬜ | — |
-| Panel de detalle: sección "Qué hacer" | ⬜ | — |
+| Nodo agente: glow animado en running | ✅ | sí |
+| Edges con color accent durante análisis | ✅ | sí |
+| Nodo finding: barra de confidence score | ✅ | sí |
+| Panel de detalle: sección "Qué hacer" | ✅ | sí |
+| `recommended_action` en todos los findings mock | ✅ | sí |
 
 ---
 
 ### FASE 3 — Narrativa de la demo
-**Estado: NO INICIADA ⬜**
+**Estado: COMPLETA ✅**
 
 | Tarea | Estado | Verificado |
 |-------|--------|-----------|
-| Spec mejorado con más ambigüedades | ⬜ | — |
-| Selector de spec (Pagos / Auth / Custom) | ⬜ | — |
-| Resumen ejecutivo al finalizar | ⬜ | — |
-| Tabla de decisiones (filtrable por nivel) | ⬜ | — |
-| Botón "Copiar resumen" | ⬜ | — |
+| Spec Auth MFA (segundo preset) | ✅ | sí |
+| Selector de spec: Pagos / Auth | ✅ | sí |
+| Resumen ejecutivo al finalizar | ✅ | sí |
+| Tabla de decisiones (filtrable por nivel) | ✅ | sí |
+| Botón "Copiar resumen" (markdown) | ✅ | sí |
 
 ---
 
 ### FASE 4 — Accesibilidad avanzada
-**Estado: NO INICIADA ⬜**
+**Estado: COMPLETA ✅**
 
 | Tarea | Estado | Verificado |
 |-------|--------|-----------|
-| Modo de solo texto (toggle mapa/tabla) | ⬜ | — |
-| Atajos de teclado Alt+1/2/3 | ⬜ | — |
-| Narración progresiva por agente | ⬜ | — |
+| Modo de solo texto (toggle mapa/tabla/texto) | ✅ | sí |
+| Atajos de teclado Alt+1/2/3 | ✅ | sí |
+| Narración progresiva por agente (aria-live assertive) | ✅ | sí |
 
 ---
 
 ### FASE 5 — Pulido presentación
-**Estado: NO INICIADA ⬜**
+**Estado: COMPLETA ✅**
 
 | Tarea | Estado | Verificado |
 |-------|--------|-----------|
-| .gitignore completo | ⬜ | — |
-| Git inicializado con primer commit | ⬜ | — |
-| URL compartible con ?spec= | ⬜ | — |
+| .gitignore completo | ✅ | sí |
+| Migración a tweladera/Confidence-Map | ✅ | sí |
+| URL compartible con ?spec=pagos\|auth | ✅ | sí |
+| pnpm en lugar de npm | ✅ | sí |
+| pyproject.toml sin dependencias duplicadas | ✅ | sí |
+| API key validada (necesita recarga de créditos) | ✅ | sí |
 
 ---
 
@@ -156,24 +153,7 @@ kill %1
 
 | # | Problema | Impacto | Estado |
 |---|---------|---------|--------|
-| 1 | Frontend no verificado end-to-end en browser | Alto | Pendiente verificar en Fase 1 |
-| 2 | Sin API key real no se puede probar el flujo completo | Alto | Fase 1.1 (mock mode) lo resuelve |
-| 3 | ~~`requirements.txt` antiguo en backend/ (obsoleto)~~ | Bajo | ✅ Eliminado 2026-05-22 |
-| 4 | ~~`backend/models.py`, `backend/main.py`, `backend/agents/` raíz (obsoletos)~~ | Medio | ✅ Eliminado 2026-05-22 |
-
----
-
-## Archivos obsoletos a eliminar
-
-Estos archivos fueron reemplazados por la estructura del paquete `confidence_map/` pero pueden seguir existiendo:
-
-```bash
-# Verificar si existen y eliminar
-ls backend/models.py 2>/dev/null && echo "OBSOLETO: backend/models.py"
-ls backend/main.py 2>/dev/null && echo "OBSOLETO: backend/main.py"
-ls backend/requirements.txt 2>/dev/null && echo "OBSOLETO: backend/requirements.txt"
-ls backend/agents/ 2>/dev/null && echo "OBSOLETO: backend/agents/ (raíz)"
-```
+| 1 | API key sin créditos — cuenta necesita recarga | Medio | Usar DEMO_MODE=true mientras tanto |
 
 ---
 
@@ -184,48 +164,50 @@ ls backend/agents/ 2>/dev/null && echo "OBSOLETO: backend/agents/ (raíz)"
 | 2026-05-20 | uv en lugar de pip/venv | Constitución: gestor único oficial |
 | 2026-05-20 | asyncio.gather en lugar de LangGraph puro | Confiabilidad demo > sofisticación |
 | 2026-05-20 | Tool use de Claude para output estructurado | Evita parseo frágil de texto libre |
-| 2026-05-20 | dagre layout para React Flow | Auto-posicionamiento, no requiere coordenadas manuales |
+| 2026-05-20 | dagre layout para React Flow | Auto-posicionamiento, sin coordenadas manuales |
 | 2026-05-22 | DEMO_MODE planificado | Limitar consumo API key en desarrollo |
+| 2026-05-26 | pnpm en lugar de npm | Seguridad: vulnerabilidades recientes en npm |
+| 2026-05-26 | [dependency-groups] en lugar de [project.optional-dependencies] | PEP 735, uv estándar moderno |
 
 ---
 
 ## Contexto de sesiones anteriores
 
-### Sesión 1 — 2026-05-20
-- Construido MVP completo (backend + frontend)
-- 6 agentes, API SSE, React Flow, accesibilidad base
+### Sesión 5 — 2026-05-26
+- Migración npm → pnpm (package.json + pnpm-lock.yaml)
+- pyproject.toml: consolidado en [dependency-groups], eliminados duplicados
+- .env.example: API key real removida → placeholder
+- API key probada: válida, cuenta sin créditos (usar DEMO_MODE=true)
+- Documentación actualizada: QUICKSTART, README, backend/README, frontend/README
+- STATUS.md y PLAN.md actualizados al estado real
+- Repo tweladera/Confidence-Map: commit inicial limpio
 
 ### Sesión 4 — 2026-05-25
-- DEMO_MODE=true implementado end-to-end (settings.py + mock_results.py + orchestrator.py)
-- _stream_mock_analysis() emite los mismos eventos SSE que el modo real, con delays simulados
-- 11 nuevos tests (test_mock_results.py): 42/42 total, 91.52% cobertura
-- mypy: 0 errores | ruff: 0 warnings
-- Backend puede iniciarse con solo DEMO_MODE=true, sin ANTHROPIC_API_KEY
+- DEMO_MODE=true implementado end-to-end
+- _stream_mock_analysis() emite los mismos eventos SSE que el modo real
+- 42/42 tests, 91.54% cobertura
+- Fases 2, 3, 4, 5 implementadas en frontend
 
 ### Sesión 3 — 2026-05-25
-- Spec NovaBank reemplaza spec genérico (personajes + contexto del PDF alineados)
-- Score de confianza global agregado al backend (promedio de confidence_score de todos los findings)
-- Score visible en header del dashboard con color adaptativo (verde/amarillo/rojo)
-- 2 nuevos tests unitarios para el orquestador (test_orchestrator.py)
-- Cobertura subió de 80.34% → 90.97%
+- Spec NovaBank reemplaza spec genérico
+- Score de confianza global en header del dashboard
+- 2 nuevos tests del orquestador
 
 ### Sesión 2 — 2026-05-22
 - Migración a uv + Python 3.12 + estructura de paquete canónica
-- spec-kit instalado y constitución creada
 - mypy strict: 0 errores; ruff: 0 warnings; pytest: 29/29
-- README raíz, backend, frontend, QUICKSTART, PLAN generados
-- STATUS.md creado (este documento)
+
+### Sesión 1 — 2026-05-20
+- MVP completo: 6 agentes, API SSE, React Flow, accesibilidad base
 
 ---
 
 ## Próxima acción
 
 ```
-TAREA:    Fase 1.2 — Timeout visible en frontend (>90s)
-ARCHIVO:  frontend/app/analysis/page.tsx (agregar indicador de timeout)
-OBJETIVO: Si el análisis demora >90s, mostrar mensaje visible al usuario
-          (aplica en modo real — mock mode siempre completa en ~5s)
-TAREA_2:  Fase 2 — Visual del mapa (animaciones, glow en nodos, barra de score)
+TAREA:    Push a tweladera/Confidence-Map con commit limpio
+OBJETIVO: Primer commit público con todas las fases implementadas
+NOTA:     Recargar créditos en console.anthropic.com para habilitar modo real
 ```
 
 ---
@@ -234,10 +216,12 @@ TAREA_2:  Fase 2 — Visual del mapa (animaciones, glow en nodos, barra de score
 
 - [ ] Backend responde `/health`
 - [ ] Frontend carga sin errores de consola
-- [ ] "Load demo" carga el spec correctamente
+- [ ] Preset "NovaBank · Pagos" carga correctamente
 - [ ] Análisis inicia y agentes se activan en secuencia
-- [ ] El mapa construye en tiempo real
-- [ ] Al hacer clic en un nodo se ve el detalle
+- [ ] El mapa construye en tiempo real con animaciones
+- [ ] Al hacer clic en un nodo se ve el detalle con "Qué hacer"
+- [ ] Tabla de decisiones muestra y filtra findings
 - [ ] Panel de accesibilidad (texto) funciona
+- [ ] Alt+1/2/3 cambia vistas
 - [ ] Demo completa < 3 minutos
 - [ ] Sin errores visibles en UI

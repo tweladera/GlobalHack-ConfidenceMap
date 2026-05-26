@@ -46,6 +46,8 @@ backend/
 │   ├── unit/
 │   │   ├── test_models.py             # 14 tests de modelos de dominio
 │   │   └── test_base_agent.py         # 9 tests del motor de agentes
+│   │   ├── test_mock_results.py       # 11 tests del modo demo
+│   │   └── test_orchestrator.py       # 2 tests del orquestador
 │   └── integration/
 │       └── test_api.py                # 6 tests de endpoints HTTP
 └── pyproject.toml                     # Toda la configuración
@@ -63,7 +65,7 @@ backend/
 
 ```bash
 cd backend
-uv sync --extra dev
+uv sync
 ```
 
 ### Configurar variables de entorno
@@ -163,7 +165,8 @@ SSE: analysis_complete
 
 | Variable | Requerida | Default | Descripción |
 |----------|-----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | **Sí** | — | API key de Anthropic |
+| `DEMO_MODE` | No | `false` | `true` = resultados pre-generados, sin API |
+| `ANTHROPIC_API_KEY` | Solo si `DEMO_MODE=false` | — | API key de Anthropic |
 | `MODEL` | No | `claude-sonnet-4-6` | Modelo Claude a usar |
 | `FRONTEND_URL` | No | `http://localhost:3000` | Origen permitido en CORS |
 

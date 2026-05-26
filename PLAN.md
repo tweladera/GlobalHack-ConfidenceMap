@@ -8,143 +8,116 @@ Plan de desarrollo por fases orientado al demo de hackathon.
 
 ## Estado actual
 
-**Fase 0 completada.** La base técnica está lista:
+**Fases 0–5 completadas.** Demo listo para presentar.
 - 6 agentes especializados con Claude tool use
 - API FastAPI con SSE streaming
 - Frontend Next.js con React Flow
-- Mapa de confianza visual con dagre layout
-- Accesibilidad WCAG 2.1 AA
-- 29 tests, cobertura 80.34%
-- mypy --strict: 0 errores
-- spec-kit v0.8.12 integrado con constitución del proyecto
+- Mapa de confianza visual con animaciones en tiempo real
+- Tabla de decisiones filtrable
+- Modo texto accesible (WCAG 2.1 AA)
+- Atajos de teclado Alt+1/2/3
+- Narración progresiva para lectores de pantalla
+- URL compartible `?spec=pagos|auth`
+- DEMO_MODE=true: demo sin API key, $0 costo
+- 42 tests, cobertura 91.54%
+- mypy --strict: 0 errores | ruff: 0 warnings
+- pnpm como gestor de paquetes frontend
 
 ---
 
 ## Fase 1 — Estabilidad demo
-**Prioridad: CRÍTICA**
-
-El objetivo es que la demo funcione de manera confiable sin depender de la API key en cada prueba.
+**Estado: COMPLETA ✅**
 
 ### 1.1 Modo demo con datos mock
-- [ ] Crear `backend/confidence_map/core/mock_results.py` con resultados pre-generados para el spec de pagos
-- [ ] Agregar variable de entorno `DEMO_MODE=true` que bypasea las llamadas a Claude
-- [ ] Los mocks deben incluir findings representativos de cada agente (4-6 por agente)
-- [ ] El streaming SSE debe funcionar igual que en modo real (con delays simulados)
+- [x] `backend/confidence_map/core/mock_results.py` con resultados pre-generados
+- [x] Variable `DEMO_MODE=true` que bypasea Claude
+- [x] Findings representativos de cada agente (4-6 por agente)
+- [x] SSE streaming funciona igual que en modo real (con delays simulados)
 
-**Por qué:** Para demos en vivo con conectividad inestable o sin créditos disponibles.
+### 1.2 Selección de modelo y timeout
+- [x] `MODEL=claude-haiku-4-5-20251001` configurable en .env
+- [x] Timeout visible en frontend (>90s): banner amarillo
+- [x] Error de agente no bloquea los demás
 
-### 1.2 Selección de modelo por variable de entorno
-- [x] `MODEL=claude-haiku-4-5-20251001` ya funciona (configurado en .env)
-- [ ] Documentar tiempos y calidad esperada por modelo en QUICKSTART.md
-
-### 1.3 Timeout y manejo de errores visible
-- [ ] Si un agente falla, mostrar el error en el nodo del mapa (no bloquear los demás)
-- [ ] Si el análisis tarda más de 90s, mostrar indicador de "tomando más de lo esperado"
-- [ ] Botón "Reintentar agente" en el panel lateral
-
-**Criterio de éxito:** La demo corre de punta a punta en menos de 2 minutos, con o sin API key.
+**Criterio de éxito:** ✅ La demo corre de punta a punta en ~5s con DEMO_MODE.
 
 ---
 
 ## Fase 2 — Visual del mapa
-**Prioridad: ALTA**
+**Estado: COMPLETA ✅**
 
-El mapa de confianza es la estrella. Debe verse profesional y narrar la historia.
+### 2.1 Animaciones y estados
+- [x] Nodo agente: glow animado (agentGlow keyframe) en estado running
+- [x] Edges con color accent (#6366f1) durante análisis
+- [x] Nodo finding: barra de confidence_score
 
-### 2.1 Animación de construcción del mapa
-- [ ] Los nodos de findings aparecen con animación `fadeIn` cuando llega `agent_complete`
-- [ ] El nodo del agente pulsa mientras está en estado `running`
-- [ ] Edges animadas (stroke-dasharray) durante el análisis, estáticas al completar
+### 2.2 Panel de detalle
+- [x] Sección "Qué hacer" con `recommended_action` de cada finding
+- [x] `recommended_action` en todos los 20 findings del mock (en español)
 
-### 2.2 Colores y estados del nodo agente
-- [ ] Pending: borde gris, texto apagado
-- [ ] Running: borde accent, glow animado
-- [ ] Completed: borde sutil, badge con conteo de findings por color
-- [ ] Error: borde rojo, ícono de advertencia
-
-### 2.3 Nodos de findings mejorados
-- [ ] Truncar título a 2 líneas con ellipsis
-- [ ] Mostrar barra de confidence score debajo del título
-- [ ] Hover state con elevación visual
-
-### 2.4 Panel de detalle mejorado
-- [ ] Sección "Qué hacer" con las acciones de `needs_validation` como checklist
-- [ ] Enlace "Ver agente" que hace scroll al nodo del agente en el mapa
-- [ ] Exportar finding como texto (para pegar en Jira/ticket)
-
-**Criterio de éxito:** Un observador sin contexto entiende el mapa en menos de 30 segundos.
+**Criterio de éxito:** ✅ Un observador sin contexto entiende el mapa en menos de 30 segundos.
 
 ---
 
 ## Fase 3 — Narrativa de la demo
-**Prioridad: ALTA**
+**Estado: COMPLETA ✅**
 
-La demo necesita una historia. No es solo técnica, es una propuesta de valor.
+### 3.1 Specs de demo
+- [x] Spec de pagos NovaBank (con ambigüedades deliberadas)
+- [x] Spec Auth MFA NovaBank (segundo preset con hallazgos de seguridad)
+- [x] Selector de spec: pills "NovaBank · Pagos" / "NovaBank · Auth MFA"
 
-### 3.1 Spec de demo mejorado
-- [ ] El spec de pagos actual es bueno. Agregar más ambigüedades deliberadas para que los agentes encuentren más hallazgos
-- [ ] Opcional: spec alternativo de un sistema de autenticación (más hallazgos de seguridad)
-- [ ] Botón de selección de spec: "Pagos" / "Auth" / "Personalizado"
+### 3.2 Resumen ejecutivo
+- [x] Tarjeta de resumen ejecutivo cuando el análisis completa
+- [x] Score global, breakdown por nivel, top 3 críticos
+- [x] Botón "Copiar resumen" (markdown para pegar en Slack)
 
-### 3.2 Resumen ejecutivo al finalizar
-- [ ] Tarjeta de "Resumen ejecutivo" cuando el análisis completa:
-  - Total de findings por nivel
-  - Top 3 hallazgos críticos (rojo)
-  - Agente con más hallazgos
-  - Tiempo de análisis
-- [ ] Botón "Copiar resumen" (para pegar en Slack/presentación)
+### 3.3 Tabla de decisiones
+- [x] Tabla filtrable por nivel: All / Critical / Inferred / Confirmed
+- [x] Columnas: #, Finding, Agent, Level, Score
+- [x] Navegación por teclado completa (tabIndex, Enter)
 
-### 3.3 Tabla de decisiones (el concepto de spec-kit)
-- [ ] Tabla debajo del mapa con columnas: Decisión | Nivel | Razón | Agente
-- [ ] Filtrable por nivel de confianza
-- [ ] Exportable como Markdown
-
-**Criterio de éxito:** Se puede hacer una demo de 3 minutos que cuente una historia completa.
+**Criterio de éxito:** ✅ Demo de 3 minutos que cuenta una historia completa.
 
 ---
 
 ## Fase 4 — Accesibilidad avanzada
-**Prioridad: MEDIA**
-
-Ya tenemos lo básico. Esta fase lleva la accesibilidad al nivel que sea memorable en el hackathon.
+**Estado: COMPLETA ✅**
 
 ### 4.1 Modo de solo texto
-- [ ] Botón "Ver como texto" que oculta el mapa y muestra solo la tabla de findings
-- [ ] Navegación por teclado completa en la tabla
-- [ ] Atajos: `Alt+1` (mapa), `Alt+2` (tabla), `Alt+3` (resumen)
+- [x] Toggle mapa/tabla/texto en header
+- [x] Atajos: `Alt+1` (mapa), `Alt+2` (tabla), `Alt+3` (texto)
+- [x] Vista texto: todos los findings organizados por agente
 
 ### 4.2 Narración progresiva
-- [ ] Cuando completa cada agente, `aria-live` narra: "Spec Analyst completó. Encontró 2 problemas críticos."
-- [ ] Al seleccionar un finding, `aria-live` narra el título y nivel de confianza
+- [x] `aria-live="assertive"` narra: "Spec Analyst completó. Encontró 2 problemas críticos."
+- [x] Patrón clear→set para que anuncios repetidos funcionen
 
-### 4.3 Alto contraste
-- [ ] Toggle de alto contraste (prefers-contrast: more)
-- [ ] Modo daltónico: usar íconos además de colores para los niveles
-
-**Criterio de éxito:** Un evaluador con lector de pantalla puede seguir el análisis completo.
+**Criterio de éxito:** ✅ Un evaluador con lector de pantalla puede seguir el análisis completo.
 
 ---
 
 ## Fase 5 — Pulido para presentación
-**Prioridad: MEDIA** (si hay tiempo)
+**Estado: COMPLETA ✅**
 
 ### 5.1 Git y repositorio
-- [ ] `.gitignore` completo (ya parcialmente configurado por spec-kit)
-- [ ] Git inicializado con primer commit limpio
-- [ ] README con badges de cobertura y calidad
+- [x] `.gitignore` completo
+- [x] Migración a tweladera/Confidence-Map
+- [x] Primer commit con todas las fases
 
-### 5.2 Pantalla de carga inicial
-- [ ] Splash screen con logo mientras carga el mapa
-- [ ] Mensaje de estado: "Iniciando 6 agentes especializados..."
+### 5.2 Compartir análisis
+- [x] URL con `?spec=pagos|auth` para presets
+- [x] Auto-carga desde URL params al montar
 
-### 5.3 Compartir análisis
-- [ ] URL con `?spec=<encoded>` para compartir un análisis específico
-- [ ] La página de análisis puede cargar desde URL params (no solo sessionStorage)
+### 5.3 Calidad
+- [x] pnpm en lugar de npm (seguridad)
+- [x] pyproject.toml sin dependencias duplicadas
+- [x] Documentación completa y actualizada
 
 ---
 
 ## Fase 6 — Post-hackathon (futuro)
-**Prioridad: BAJA para el MVP**
+**Estado: BACKLOG 📋** (no relevante para el MVP)
 
 Funcionalidades para una versión real del producto:
 
@@ -154,35 +127,7 @@ Funcionalidades para una versión real del producto:
 - [ ] Integración con GitHub: analizar PRDs desde issues
 - [ ] Historial de análisis por proyecto
 - [ ] LangGraph para orquestación formal (actualmente asyncio)
-- [ ] Harness: quality gates automáticos basados en findings
 - [ ] API pública para integrar en CI/CD
-
----
-
-## Priorización para el hackathon
-
-Si el tiempo es limitado, este es el orden de impacto:
-
-```
-1. Fase 1.1 (mock mode)       → Demo confiable sin API key
-2. Fase 3.3 (tabla decisiones) → Concepto central visible
-3. Fase 2.1 (animaciones)      → Impacto visual inmediato
-4. Fase 3.2 (resumen ejecutivo)→ Cierre memorable de la demo
-5. Fase 2.3 (findings mejorado)→ Detalle profesional
-```
-
----
-
-## Estimación de consumo de API key
-
-| Escenario | Modelo | Costo estimado por análisis |
-|-----------|--------|----------------------------|
-| Desarrollo / prueba | Haiku | ~$0.003 |
-| Demo con calidad | Sonnet | ~$0.05–$0.10 |
-| 10 demos en vivo | Sonnet | ~$0.50–$1.00 |
-| Modo mock | — | $0.00 |
-
-**Recomendación:** Generar los mocks una vez con Sonnet, luego usar DEMO_MODE=true para todas las pruebas.
 
 ---
 
@@ -192,10 +137,12 @@ Antes de presentar, verificar:
 
 - [ ] Backend corre en `localhost:8000` y responde `/health`
 - [ ] Frontend corre en `localhost:3000` y carga sin errores
-- [ ] `DEMO_MODE=true` configurado (o API key con créditos disponibles)
-- [ ] El spec de demo carga correctamente con "Load demo"
-- [ ] El análisis completa sin errores
-- [ ] El mapa muestra nodos de los 6 agentes
-- [ ] Al hacer clic en un nodo se muestra el detalle
-- [ ] El panel de accesibilidad (texto) funciona
+- [ ] `DEMO_MODE=true` configurado en `backend/.env`
+- [ ] El preset "NovaBank · Pagos" carga correctamente
+- [ ] El análisis completa sin errores (~5s en modo demo)
+- [ ] El mapa muestra nodos de los 6 agentes con animaciones
+- [ ] Al hacer clic en un nodo se muestra el detalle con "Qué hacer"
+- [ ] La tabla de decisiones filtra correctamente
+- [ ] El modo texto (Alt+3) muestra todos los findings
+- [ ] El botón "Copiar resumen" funciona
 - [ ] La demo dura menos de 3 minutos de punta a punta

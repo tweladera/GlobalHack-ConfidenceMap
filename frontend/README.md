@@ -46,16 +46,16 @@ frontend/
 
 ### Requisitos previos
 - Node.js 20+
-- npm 10+
+- pnpm 8+
 
 ### Instalar dependencias
 
 ```bash
 cd frontend
-npm install --registry https://registry.npmjs.org
+pnpm install --registry https://registry.npmjs.org
 ```
 
-> Si tu red usa un registry privado (Artifactory, etc.), el flag `--registry` apunta al registry público de npm.
+> Si tu red usa un registry privado (Artifactory, etc.), el flag `--registry` apunta al registry público.
 
 ---
 
@@ -63,14 +63,14 @@ npm install --registry https://registry.npmjs.org
 
 ```bash
 # Desarrollo
-npm run dev
+pnpm dev
 
 # Build de producción
-npm run build
-npm start
+pnpm build
+pnpm start
 
 # Verificar tipos
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 ```
 
 La app queda disponible en `http://localhost:3000`.
@@ -203,7 +203,7 @@ El frontend no requiere variables de entorno en desarrollo. En producción:
 ## Build y despliegue
 
 ```bash
-npm run build
+pnpm build
 # Output estático en .next/
 # Deploy en Vercel, Netlify, o cualquier servidor Node.js
 ```

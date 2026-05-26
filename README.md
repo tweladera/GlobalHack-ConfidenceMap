@@ -92,14 +92,12 @@ El mapa es la estrella visual de la plataforma.
 confidence-map/
 ├── backend/              # API FastAPI + 6 agentes
 │   ├── confidence_map/   # Paquete principal Python
-│   ├── tests/            # pytest · ≥80% cobertura
+│   ├── tests/            # pytest · 42 tests · ≥80% cobertura
 │   └── pyproject.toml    # uv · mypy · ruff · pytest
 ├── frontend/             # Next.js 15 App Router
 │   ├── app/              # Páginas
 │   └── components/       # Componentes React
-├── .specify/             # spec-kit: constitución y templates
-│   └── memory/
-│       └── constitution.md
+├── docs/                 # Arquitectura de referencia y documentos
 ├── QUICKSTART.md         # Guía de inicio rápido
 └── PLAN.md               # Plan de trabajo por fases
 ```
@@ -115,16 +113,23 @@ Consulta [QUICKSTART.md](./QUICKSTART.md) para instrucciones completas.
 cd backend && uv run uvicorn confidence_map.main:app --reload
 
 # Frontend
-cd frontend && npm run dev
+cd frontend && pnpm dev
 ```
 
 ---
 
 ## Estado del proyecto
 
-**MVP para hackathon** — Fase 0 completada.
+**Demo completo — Fases 1–5 implementadas.**
 
-Ver [PLAN.md](./PLAN.md) para el roadmap por fases.
+- DEMO_MODE: análisis sin API key, $0 costo
+- Mapa visual con animaciones en tiempo real
+- Tabla de decisiones filtrable
+- Modo texto accesible (WCAG 2.1 AA)
+- Dos specs de demo: NovaBank Pagos + Auth MFA
+- URL compartible con `?spec=pagos|auth`
+
+Ver [PLAN.md](./PLAN.md) para el roadmap completo.
 
 ---
 
@@ -135,11 +140,11 @@ Ver [PLAN.md](./PLAN.md) para el roadmap por fases.
 | Backend | Python 3.12, FastAPI, uv |
 | IA | Anthropic SDK, Claude Sonnet 4.6 |
 | Tipado | mypy --strict, Pydantic v2 |
-| Tests | pytest, pytest-asyncio, cobertura ≥80% |
+| Tests | pytest, pytest-asyncio, 42 tests, cobertura ≥80% |
 | Frontend | Next.js 15, TypeScript strict |
+| Gestor de paquetes | pnpm 10 |
 | Visualización | React Flow, dagre layout |
 | Estilos | Tailwind CSS |
-| Especificación | spec-kit v0.8.12 |
 
 ---
 
@@ -148,6 +153,6 @@ Ver [PLAN.md](./PLAN.md) para el roadmap por fases.
 Este proyecto sigue una [constitución](./.specify/memory/constitution.md) que establece:
 - Tipado estático estricto (Python 3.12+, TypeScript strict)
 - Tests obligatorios con cobertura mínima del 80%
-- Gestión de dependencias exclusivamente con `uv`
+- Gestión de dependencias: `uv` (backend) · `pnpm` (frontend)
 - Accesibilidad WCAG 2.1 AA como requisito de producción
 - Código limpio y mínimo (YAGNI)

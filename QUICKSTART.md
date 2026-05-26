@@ -13,11 +13,16 @@ Instala estas herramientas antes de comenzar:
 | Python | 3.12+ | `python3 --version` |
 | uv | 0.11+ | `uv --version` |
 | Node.js | 20+ | `node --version` |
-| npm | 10+ | `npm --version` |
+| pnpm | 8+ | `pnpm --version` |
 
 ### Instalar uv (si no lo tienes)
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Instalar pnpm (si no lo tienes)
+```bash
+npm install -g pnpm
 ```
 
 ---
@@ -32,7 +37,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 > **Limitaciones con la API key:**
 > - El plan gratuito tiene límites de uso. Para el hackathon recomendamos el plan de pago mínimo (~$5 USD).
 > - En desarrollo, usar el modelo `claude-haiku-4-5-20251001` que es ~20x más barato que Sonnet.
-> - El **modo demo** (spec pre-cargada) consume aproximadamente $0.05–$0.10 USD por análisis completo con Sonnet.
+> - El **modo demo** (`DEMO_MODE=true`) no consume créditos — usa resultados pre-generados.
 
 ---
 
@@ -51,27 +56,30 @@ cp .env.example .env
 ### 2.2 Editar `.env`
 
 ```env
-# REQUERIDO: tu API key de Anthropic
+# Modo demo: true = sin API key ($0), false = Claude API real
+DEMO_MODE=true
+
+# Solo requerida cuando DEMO_MODE=false
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxxxxxxxxxxxx
 
-# OPCIONAL: modelo a usar (cambiar a haiku para reducir costos en desarrollo)
+# Modelo a usar (cambiar a haiku para reducir costos)
 MODEL=claude-sonnet-4-6
 
-# OPCIONAL: URL del frontend (para CORS)
+# URL del frontend (para CORS)
 FRONTEND_URL=http://localhost:3000
 ```
 
 ### 2.3 Instalar dependencias
 
 ```bash
-uv sync --extra dev
+uv sync
 ```
 
 ### 2.4 Verificar instalación
 
 ```bash
 ANTHROPIC_API_KEY=test uv run pytest --no-header -q
-# Esperado: 29 passed, cobertura ≥80%
+# Esperado: 42 passed, cobertura ≥80%
 ```
 
 ### 2.5 Arrancar el servidor
@@ -95,15 +103,15 @@ cd frontend
 ### 3.1 Instalar dependencias
 
 ```bash
-npm install --registry https://registry.npmjs.org
+pnpm install --registry https://registry.npmjs.org
 ```
 
-> Si tienes un registry privado configurado en tu sistema (Artifactory, Nexus, etc.), el flag `--registry` es necesario para instalar desde el registry público de npm.
+> Si tienes un registry privado configurado en tu sistema (Artifactory, Nexus, etc.), el flag `--registry` es necesario para instalar desde el registry público.
 
 ### 3.2 Arrancar el servidor
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Verificar: abrir `http://localhost:3000` en el navegador.
@@ -113,11 +121,12 @@ Verificar: abrir `http://localhost:3000` en el navegador.
 ## Paso 4 — Ejecutar el demo
 
 1. Abrir `http://localhost:3000`
-2. Hacer clic en **"Load demo"** para cargar el spec de ejemplo
+2. Hacer clic en **"NovaBank · Pagos"** o **"NovaBank · Auth MFA"** para cargar un spec de ejemplo
 3. Hacer clic en **"Run Analysis"**
-4. Observar cómo los agentes se activan en tiempo real en el mapa
+4. Observar cómo los 6 agentes se activan en tiempo real en el mapa
 
-El análisis completo toma aproximadamente **60–120 segundos** (6 agentes × ~20s cada uno, con paralelismo en los últimos 5).
+Con `DEMO_MODE=true`, el análisis completo toma aproximadamente **5 segundos**.
+Con la API real, toma entre **60–120 segundos** (6 agentes × ~20s con paralelismo).
 
 ---
 
@@ -127,7 +136,8 @@ El análisis completo toma aproximadamente **60–120 segundos** (6 agentes × ~
 
 | Variable | Requerida | Valor por defecto | Descripción |
 |----------|-----------|-------------------|-------------|
-| `ANTHROPIC_API_KEY` | **Sí** | — | API key de Anthropic. Formato: `sk-ant-...` |
+| `DEMO_MODE` | No | `false` | `true` = resultados pre-generados sin API |
+| `ANTHROPIC_API_KEY` | Solo si `DEMO_MODE=false` | — | API key de Anthropic |
 | `MODEL` | No | `claude-sonnet-4-6` | Modelo Claude a usar |
 | `FRONTEND_URL` | No | `http://localhost:3000` | Origen permitido en CORS |
 
@@ -137,7 +147,6 @@ El análisis completo toma aproximadamente **60–120 segundos** (6 agentes × ~
 |--------|-----------|---------------|------------------|
 | `claude-haiku-4-5-20251001` | Rápido | Bajo (~1x) | Desarrollo y pruebas |
 | `claude-sonnet-4-6` | Medio | Medio (~5x) | Demo y producción |
-| `claude-opus-4-6` | Lento | Alto (~15x) | No recomendado para este MVP |
 
 ### Frontend
 
@@ -162,21 +171,23 @@ Para CI/CD o despliegue en la nube, configurar `ANTHROPIC_API_KEY` como secret e
 
 ## Reducir consumo de API key
 
-Para desarrollar y probar sin gastar créditos:
-
-### Opción 1: Usar Haiku en `.env`
+### Opción 1: Modo demo con datos pre-generados (recomendado)
 ```env
+DEMO_MODE=true
+```
+El análisis usa resultados pre-generados realistas — $0 de costo.
+
+### Opción 2: Usar Haiku en `.env`
+```env
+DEMO_MODE=false
 MODEL=claude-haiku-4-5-20251001
 ```
 
-### Opción 2: Mockear la API en tests
+### Opción 3: Mockear la API en tests
 Los tests usan mocks y nunca llaman a la API real:
 ```bash
 ANTHROPIC_API_KEY=test uv run pytest
 ```
-
-### Opción 3: Modo demo con datos pre-generados (Fase 1 del plan)
-Próximamente: cargar resultados pre-generados sin consumir API.
 
 ---
 
@@ -187,14 +198,14 @@ Próximamente: cargar resultados pre-generados sin consumir API.
 cd backend && uv run uvicorn confidence_map.main:app --reload
 
 # Terminal 2: frontend
-cd frontend && npm run dev
+cd frontend && pnpm dev
 
 # Terminal 3: verificar health
 curl http://localhost:8000/health
 # → {"status":"ok","version":"0.1.0"}
 ```
 
-Abrir `http://localhost:3000`, cargar demo, ejecutar análisis.
+Abrir `http://localhost:3000`, cargar un preset, ejecutar análisis.
 
 ---
 
@@ -204,7 +215,7 @@ Abrir `http://localhost:3000`, cargar demo, ejecutar análisis.
 ```
 pydantic_settings.main.SettingsError: field required
 ```
-Solución: crear `backend/.env` con `ANTHROPIC_API_KEY=sk-ant-...`
+Solución: crear `backend/.env` con `DEMO_MODE=true` (o agregar la key).
 
 ### Error: `Connection refused` al hacer análisis
 El backend no está corriendo. Ejecutar:
@@ -212,21 +223,25 @@ El backend no está corriendo. Ejecutar:
 cd backend && uv run uvicorn confidence_map.main:app --reload
 ```
 
-### Error: `npm install` falla con 401
+### Error: `pnpm install` falla con 401
 Registry privado detectado. Usar:
 ```bash
-npm install --registry https://registry.npmjs.org
+pnpm install --registry https://registry.npmjs.org
 ```
 
 ### El análisis tarda demasiado
-Cambiar a Haiku en `backend/.env`:
+Cambiar a modo demo en `backend/.env`:
+```env
+DEMO_MODE=true
+```
+O usar Haiku:
 ```env
 MODEL=claude-haiku-4-5-20251001
 ```
 
 ### Tests fallan con error de importación
 ```bash
-cd backend && uv sync --extra dev
+cd backend && uv sync
 ```
 
 ---
@@ -235,17 +250,17 @@ cd backend && uv sync --extra dev
 
 ```bash
 # Instalar todo
-cd backend && uv sync --extra dev
-cd frontend && npm install --registry https://registry.npmjs.org
+cd backend && uv sync
+cd frontend && pnpm install --registry https://registry.npmjs.org
 
 # Arrancar (2 terminales)
 cd backend && uv run uvicorn confidence_map.main:app --reload
-cd frontend && npm run dev
+cd frontend && pnpm dev
 
 # Tests
 cd backend && ANTHROPIC_API_KEY=test uv run pytest -q
 
 # Quality gates
 cd backend && uv run mypy --strict confidence_map/ && uv run ruff check confidence_map/
-cd frontend && npx tsc --noEmit
+cd frontend && pnpm exec tsc --noEmit
 ```
