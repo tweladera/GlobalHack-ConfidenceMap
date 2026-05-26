@@ -122,6 +122,11 @@ dev-frontend: ## Levantar solo el frontend (hot reload en :3000)
 	@printf "$(CYAN)→ Frontend en http://localhost:$(FRONTEND_PORT)$(RESET)\n\n"
 	@cd $(FRONTEND_DIR) && $(PNPM) dev --port $(FRONTEND_PORT)
 
+stop: ## Matar procesos en los puertos del backend (:8000) y frontend (:3000)
+	@printf "$(CYAN)→ Matando procesos en :$(BACKEND_PORT) y :$(FRONTEND_PORT)$(RESET)\n"
+	@kill $$(lsof -ti :$(BACKEND_PORT)) 2>/dev/null && printf "  $(GREEN)✓$(RESET) Backend detenido (:$(BACKEND_PORT))\n" || printf "  → Nada corriendo en :$(BACKEND_PORT)\n"
+	@kill $$(lsof -ti :$(FRONTEND_PORT)) 2>/dev/null && printf "  $(GREEN)✓$(RESET) Frontend detenido (:$(FRONTEND_PORT))\n" || printf "  → Nada corriendo en :$(FRONTEND_PORT)\n"
+
 demo: ## Levantar en DEMO_MODE=true (sin API key, datos pre-generados)
 	@printf "$(CYAN)$(BOLD)→ Confidence Map — MODO DEMO$(RESET) (sin API key)\n"
 	@printf "  Backend:  $(CYAN)http://localhost:$(BACKEND_PORT)$(RESET)\n"

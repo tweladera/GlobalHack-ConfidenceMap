@@ -47,7 +47,10 @@ _FINDING_SCHEMA: dict[str, Any] = {
         },
         "recommended_action": {
             "type": "string",
-            "description": "Concrete next step: what the team should do to address this finding (1-2 sentences)",
+            "description": (
+                "Concrete next step: what the team should do"
+                " to address this finding (1-2 sentences)"
+            ),
         },
         "category": {
             "type": "string",
