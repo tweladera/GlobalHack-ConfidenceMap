@@ -42,7 +42,9 @@ _USER_TEMPLATE = """Based on software delivery history and common engineering pa
 What patterns do you recognize? What typically goes wrong with systems like this?"""
 
 
-async def run(spec: str, architecture: str = "", context: str = "") -> AgentResult:
+async def run(
+    spec: str, architecture: str = "", context: str = "", language: str = "en"
+) -> AgentResult:
     arch_block = f"<architecture>{architecture}</architecture>\n\n" if architecture else ""
     ctx_block = f"<context>{context}</context>\n\n" if context else ""
     return await call_agent(
@@ -53,4 +55,5 @@ async def run(spec: str, architecture: str = "", context: str = "") -> AgentResu
         user_prompt=_USER_TEMPLATE.format(
             spec=spec, arch_block=arch_block, ctx_block=ctx_block
         ),
+        language=language,
     )

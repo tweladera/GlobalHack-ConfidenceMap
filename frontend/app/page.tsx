@@ -9,7 +9,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [spec, setSpec] = useState("");
   const [architecture, setArchitecture] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +49,7 @@ function HomePageContent() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec, architecture }),
+        body: JSON.stringify({ spec, architecture, language: lang }),
       });
 
       if (!res.ok) throw new Error("Failed to start analysis");

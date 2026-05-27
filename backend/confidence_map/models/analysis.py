@@ -11,6 +11,7 @@ class AnalysisRequest(BaseModel):
     spec: str = Field(min_length=10, description="Specification text to analyze")
     architecture: str = Field(default="", description="Optional architecture description")
     context: str = Field(default="", description="Optional additional context")
+    language: str = Field(default="en", description="Response language: en | es | pt")
 
 
 class AnalysisStartResponse(BaseModel):

@@ -88,6 +88,23 @@ REPORT_FINDINGS_TOOL: anthropic.types.ToolParam = {
 }
 
 
+# ── Language instructions ──────────────────────────────────────────────────────
+
+_LANG_INSTRUCTIONS: dict[str, str] = {
+    "en": "",
+    "es": (
+        "\n\nIMPORTANT: Respond entirely in Spanish. All finding titles, descriptions, "
+        "evidence, assumptions, validation items, recommended actions, and the summary "
+        "must be written in Spanish."
+    ),
+    "pt": (
+        "\n\nIMPORTANT: Respond entirely in Brazilian Portuguese. All finding titles, "
+        "descriptions, evidence, assumptions, validation items, recommended actions, "
+        "and the summary must be written in Brazilian Portuguese."
+    ),
+}
+
+
 # ── Agent runner ──────────────────────────────────────────────────────────────
 
 
@@ -98,6 +115,7 @@ async def call_agent(
     agent_icon: str,
     system_prompt: str,
     user_prompt: str,
+    language: str = "en",
 ) -> AgentResult:
     """Run a single agent via Claude tool use and return structured findings.
 
@@ -113,11 +131,12 @@ async def call_agent(
         status=AgentStatus.RUNNING,
     )
 
+    lang_instruction = _LANG_INSTRUCTIONS.get(language, "")
     try:
         response = await client.messages.create(
             model=settings.model,
             max_tokens=4096,
-            system=system_prompt,
+            system=system_prompt + lang_instruction,
             messages=[{"role": "user", "content": user_prompt}],
             tools=[REPORT_FINDINGS_TOOL],
             tool_choice={"type": "any"},

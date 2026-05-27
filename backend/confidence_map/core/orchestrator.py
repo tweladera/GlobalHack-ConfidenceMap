@@ -26,7 +26,7 @@ class _AgentModule(Protocol):
     AGENT_NAME: str
 
     def run(
-        self, spec: str, architecture: str, context: str
+        self, spec: str, architecture: str, context: str, language: str
     ) -> Coroutine[Any, Any, AgentResult]: ...
 
 
@@ -48,9 +48,9 @@ _PHASE2_AGENTS = [
 ]
 
 
-async def _stream_mock_analysis() -> AsyncGenerator[SSEEvent, None]:
+async def _stream_mock_analysis(language: str = "en") -> AsyncGenerator[SSEEvent, None]:
     """Emit pre-generated NovaBank mock results with simulated timing."""
-    mock_results = get_mock_results()
+    mock_results = get_mock_results(language)
     queue: asyncio.Queue[SSEEvent | None] = asyncio.Queue()
 
     async def emit_agent(agent_id: str) -> None:
@@ -123,7 +123,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
     Phase 2: Five remaining agents run concurrently via asyncio.gather.
     """
     if get_settings().demo_mode:
-        async for mock_event in _stream_mock_analysis():
+        async for mock_event in _stream_mock_analysis(request.language):
             yield mock_event
         return
 
@@ -141,6 +141,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
             spec=request.spec,
             architecture=request.architecture,
             context=request.context,
+            language=request.language,
         )
         event_type = (
             SSEEventType.AGENT_COMPLETE
