@@ -7,6 +7,7 @@ import AgentStatusCard from "@/components/AgentStatusCard";
 import FindingDetail from "@/components/FindingDetail";
 import AccessibleSummary from "@/components/AccessibleSummary";
 import DecisionTable from "@/components/DecisionTable";
+import HeatMap from "@/components/HeatMap";
 import type { AgentState, Finding, SSEEvent } from "@/types";
 import { AGENT_DEFINITIONS } from "@/types";
 import { useI18n } from "@/lib/i18n";
@@ -42,6 +43,7 @@ export default function AnalysisPage() {
   const [timeoutWarning, setTimeoutWarning] = useState(false);
   const [showTable, setShowTable] = useState(false);
   const [textMode, setTextMode] = useState(false);
+  const [showHeatMap, setShowHeatMap] = useState(false);
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -58,13 +60,14 @@ export default function AnalysisPage() {
     announceTimerRef.current = setTimeout(() => setAnnouncement(text), 60);
   };
 
-  // Keyboard shortcuts: Alt+1 Map · Alt+2 Table · Alt+3 Text
+  // Keyboard shortcuts: Alt+1 Map · Alt+2 Table · Alt+3 Text · Alt+4 Heat Map
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!e.altKey) return;
-      if (e.key === "1") { e.preventDefault(); setTextMode(false); setShowTable(false); }
-      if (e.key === "2") { e.preventDefault(); setTextMode(false); setShowTable(true); }
-      if (e.key === "3") { e.preventDefault(); setTextMode(true); }
+      if (e.key === "1") { e.preventDefault(); setTextMode(false); setShowTable(false); setShowHeatMap(false); }
+      if (e.key === "2") { e.preventDefault(); setTextMode(false); setShowTable(true);  setShowHeatMap(false); }
+      if (e.key === "3") { e.preventDefault(); setTextMode(true);  setShowTable(false); setShowHeatMap(false); }
+      if (e.key === "4") { e.preventDefault(); setTextMode(false); setShowTable(false); setShowHeatMap(true); }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -269,7 +272,7 @@ export default function AnalysisPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const activeView = textMode ? "text" : showTable ? "table" : "map";
+  const activeView = textMode ? "text" : showHeatMap ? "heat" : showTable ? "table" : "map";
 
   return (
     <div className="flex flex-col h-screen bg-surface overflow-hidden">
@@ -326,27 +329,29 @@ export default function AnalysisPage() {
           )}
         </div>
 
-        {/* Map / Table / Text toggle */}
+        {/* Map / Table / Text / Heat toggle */}
         {allFindings.length > 0 && (
           <div
             className="flex items-center rounded-lg border border-surface-border overflow-hidden text-xs font-mono"
             role="group"
-            aria-label="View mode (Alt+1 Map, Alt+2 Table, Alt+3 Text)"
+            aria-label="View mode (Alt+1 Map, Alt+2 Table, Alt+3 Text, Alt+4 Heat Map)"
           >
-            {(["map", "table", "text"] as const).map((view, i) => {
-              const labels = {
+            {(["map", "table", "text", "heat"] as const).map((view, i) => {
+              const labels: Record<string, string> = {
                 map: t("analysis.view_map"),
                 table: t("analysis.view_table"),
                 text: t("analysis.view_text"),
+                heat: "Heat",
               };
               const active = activeView === view;
               return (
                 <button
                   key={view}
                   onClick={() => {
-                    if (view === "map")   { setTextMode(false); setShowTable(false); }
-                    if (view === "table") { setTextMode(false); setShowTable(true); }
-                    if (view === "text")  { setTextMode(true); }
+                    if (view === "map")   { setTextMode(false); setShowTable(false); setShowHeatMap(false); }
+                    if (view === "table") { setTextMode(false); setShowTable(true);  setShowHeatMap(false); }
+                    if (view === "text")  { setTextMode(true);  setShowTable(false); setShowHeatMap(false); }
+                    if (view === "heat")  { setTextMode(false); setShowTable(false); setShowHeatMap(true); }
                   }}
                   className={`px-3 py-1.5 transition-colors border-l first:border-l-0 border-surface-border ${active ? "bg-accent text-white" : "text-slate-400 hover:text-slate-200"}`}
                   aria-pressed={active}
@@ -594,6 +599,12 @@ export default function AnalysisPage() {
             </div>
           ) : showTable ? (
             <DecisionTable
+              findings={allFindings}
+              onSelect={setSelectedFinding}
+              selectedFinding={selectedFinding}
+            />
+          ) : showHeatMap ? (
+            <HeatMap
               findings={allFindings}
               onSelect={setSelectedFinding}
               selectedFinding={selectedFinding}
