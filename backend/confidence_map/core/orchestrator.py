@@ -188,7 +188,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
     try:
         while True:
             logger.info("[orchestrator] Waiting for next event from queue...")
-            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=100.0)
+            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=130.0)
             if event is None:
                 break
             logger.info("[orchestrator] Got event: %s", event.type)
