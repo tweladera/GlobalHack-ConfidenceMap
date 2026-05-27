@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from collections.abc import AsyncGenerator
@@ -68,8 +69,33 @@ async def translate_results(request: TranslateRequest) -> TranslateResponse:
 
 
 async def _sse_generator(request: AnalysisRequest) -> AsyncGenerator[str, None]:
-    async for event in stream_analysis(request):
-        yield _format_sse(event)
+    """Yield SSE events with keepalive comments to flush proxy buffers.
+
+    Next.js dev proxy (and nginx/other proxies) may buffer chunks until a
+    certain size is reached. Sending a SSE comment (`:keepalive`) every few
+    seconds forces a flush so the browser receives events in real time.
+    """
+    event_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def _pump() -> None:
+        async for event in stream_analysis(request):
+            await event_queue.put(_format_sse(event))
+        await event_queue.put(None)  # sentinel
+
+    pump_task = asyncio.create_task(_pump())
+
+    try:
+        while True:
+            try:
+                chunk = await asyncio.wait_for(event_queue.get(), timeout=5.0)
+                if chunk is None:
+                    break
+                yield chunk
+            except TimeoutError:
+                yield ":keepalive\n\n"  # SSE comment — ignored by EventSource, flushes proxy
+    finally:
+        if not pump_task.done():
+            pump_task.cancel()
 
 
 def _format_sse(event: SSEEvent) -> str:

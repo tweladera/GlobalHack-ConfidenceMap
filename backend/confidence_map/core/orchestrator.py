@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncGenerator, Coroutine
 from typing import Any, Protocol
 
@@ -19,6 +20,8 @@ from confidence_map.core.settings import get_settings
 from confidence_map.models.analysis import AnalysisRequest, ConfidenceDistribution
 from confidence_map.models.events import SSEEvent, SSEEventType
 from confidence_map.models.findings import AgentResult
+
+logger = logging.getLogger(__name__)
 
 
 class _AgentModule(Protocol):
@@ -134,15 +137,18 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         agent_id: str,
         agent_name: str,
     ) -> None:
+        logger.info("[orchestrator] Putting AGENT_START for %s", agent_id)
         await queue.put(
             SSEEvent(type=SSEEventType.AGENT_START, agent_id=agent_id, agent_name=agent_name)
         )
+        logger.info("[orchestrator] Calling agent %s", agent_id)
         result: AgentResult = await agent_module.run(
             spec=request.spec,
             architecture=request.architecture,
             context=request.context,
             language=request.language,
         )
+        logger.info("[orchestrator] Agent %s done, status=%s", agent_id, result.status)
         event_type = (
             SSEEventType.AGENT_COMPLETE
             if result.error is None
@@ -173,6 +179,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         )
         await queue.put(None)  # sentinel
 
+    logger.info("[orchestrator] Starting real-mode analysis, creating orchestrate task")
     task = asyncio.create_task(orchestrate())
     dist = ConfidenceDistribution()
     total_findings = 0
@@ -180,9 +187,11 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
 
     try:
         while True:
+            logger.info("[orchestrator] Waiting for next event from queue...")
             event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=100.0)
             if event is None:
                 break
+            logger.info("[orchestrator] Got event: %s", event.type)
 
             if event.type == SSEEventType.AGENT_COMPLETE and event.result:
                 for f in event.result.get("findings", []):
