@@ -38,6 +38,7 @@
   "analysis.timeout": "A análise está demorando mais do que o esperado — ainda em execução, por favor aguarde",
   "analysis.no_finding": "Clique em qualquer nó do mapa para ver os detalhes",
   "analysis.all_findings": "Todos os achados ({count})",
+  "analysis.translating": "Traduzindo resultados...",
 
   "summary.title": "Resumo executivo",
   "summary.copy": "Copiar",

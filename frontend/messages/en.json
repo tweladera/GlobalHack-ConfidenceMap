@@ -38,6 +38,7 @@
   "analysis.timeout": "Analysis is taking longer than expected — still running, please wait",
   "analysis.no_finding": "Click any finding node on the map to see details",
   "analysis.all_findings": "All findings ({count})",
+  "analysis.translating": "Translating results...",
 
   "summary.title": "Executive summary",
   "summary.copy": "Copy",

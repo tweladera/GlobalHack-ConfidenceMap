@@ -31,7 +31,7 @@ const INITIAL_AGENTS: AgentState[] = AGENT_DEFINITIONS.map((a) => ({
 
 export default function AnalysisPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [agents, setAgents] = useState<AgentState[]>(INITIAL_AGENTS);
   const [allFindings, setAllFindings] = useState<Finding[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
@@ -44,9 +44,12 @@ export default function AnalysisPage() {
   const [textMode, setTextMode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Prevents translation from firing on the initial analysis_complete event
+  const analysisJustCompletedRef = useRef(false);
 
   const announce = (text: string) => {
     // Clear → re-set so screen readers fire a new announcement even if text is similar
@@ -127,6 +130,7 @@ export default function AnalysisPage() {
 
       if (event.type === "analysis_complete") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        analysisJustCompletedRef.current = true;
         setIsComplete(true);
         setTimeoutWarning(false);
         if (event.confidence_distribution) {
@@ -157,6 +161,43 @@ export default function AnalysisPage() {
       es.close();
     };
   }, [router]);
+
+  // Translate displayed results when the user switches language after analysis is complete
+  useEffect(() => {
+    if (!isComplete) return;
+
+    // Skip the first time isComplete becomes true (results are already in the right language)
+    if (analysisJustCompletedRef.current) {
+      analysisJustCompletedRef.current = false;
+      return;
+    }
+
+    const translate = async () => {
+      setIsTranslating(true);
+      try {
+        const res = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ language: lang }),
+        });
+        if (!res.ok) return;
+        const data: { agents: AgentState[] } = await res.json();
+        setAgents((prev) =>
+          prev.map((a) => {
+            const translated = data.agents.find((ta) => ta.agent_id === a.agent_id);
+            if (!translated) return a;
+            return { ...a, findings: translated.findings, summary: translated.summary };
+          })
+        );
+        setAllFindings(data.agents.flatMap((a) => a.findings));
+        setSelectedFinding(null);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    void translate();
+  }, [lang, isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const completedCount = agents.filter((a) => a.status === "completed").length;
   const progress = Math.round((completedCount / agents.length) * 100);
@@ -339,10 +380,24 @@ export default function AnalysisPage() {
       {/* Main content */}
       <main
         id="main-content"
-        className="flex flex-1 overflow-hidden"
+        className="relative flex flex-1 overflow-hidden"
         aria-label="Confidence map analysis"
       >
-        {/* Left sidebar — agent status */}
+        {/* Translation overlay */}
+      {isTranslating && (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center bg-surface/80 backdrop-blur-sm"
+          aria-live="polite"
+          aria-label="Translating results..."
+        >
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-surface-card border border-surface-border shadow-lg">
+            <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            <span className="text-sm text-slate-300 font-mono">{t("analysis.translating")}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Left sidebar — agent status */}
         <aside
           className="w-64 flex-shrink-0 border-r border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Agent status panel"

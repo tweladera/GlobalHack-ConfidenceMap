@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from confidence_map.models.findings import AgentResult
+
 
 class AnalysisRequest(BaseModel):
     """Input for starting a new analysis."""
@@ -18,6 +20,18 @@ class AnalysisStartResponse(BaseModel):
     """Response returned when an analysis is queued."""
 
     analysis_id: str
+
+
+class TranslateRequest(BaseModel):
+    """Input for translating existing results to a new language."""
+
+    language: str = Field(default="en", description="Target language: en | es | pt")
+
+
+class TranslateResponse(BaseModel):
+    """Translated agent results."""
+
+    agents: list[AgentResult]
 
 
 class ConfidenceDistribution(BaseModel):

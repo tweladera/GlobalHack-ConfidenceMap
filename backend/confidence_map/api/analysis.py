@@ -9,8 +9,15 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from confidence_map.core.mock_results import get_mock_results
 from confidence_map.core.orchestrator import stream_analysis
-from confidence_map.models.analysis import AnalysisRequest, AnalysisStartResponse
+from confidence_map.core.settings import get_settings
+from confidence_map.models.analysis import (
+    AnalysisRequest,
+    AnalysisStartResponse,
+    TranslateRequest,
+    TranslateResponse,
+)
 from confidence_map.models.events import SSEEvent
 
 router = APIRouter(prefix="/api", tags=["analysis"])
@@ -44,6 +51,20 @@ async def stream_analysis_results(analysis_id: str) -> StreamingResponse:
             "Connection": "keep-alive",
         },
     )
+
+
+@router.post("/translate", response_model=TranslateResponse)
+async def translate_results(request: TranslateRequest) -> TranslateResponse:
+    """Return pre-translated results for the given language.
+
+    In DEMO_MODE: returns mock results instantly (< 100ms).
+    In live mode: not yet implemented — returns English mock as fallback.
+    """
+    settings = get_settings()
+    if settings.demo_mode:
+        agents = get_mock_results(request.language)
+        return TranslateResponse(agents=agents)
+    raise HTTPException(status_code=501, detail="Post-analysis translation requires DEMO_MODE=true")
 
 
 async def _sse_generator(request: AnalysisRequest) -> AsyncGenerator[str, None]:
