@@ -178,7 +178,7 @@ export default function AnalysisPage() {
         const res = await fetch("/api/translate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ language: lang }),
+          body: JSON.stringify({ language: lang, agents }),
         });
         if (!res.ok) return;
         const data: { agents: AgentState[] } = await res.json();

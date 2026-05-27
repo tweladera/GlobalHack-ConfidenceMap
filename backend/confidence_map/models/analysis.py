@@ -26,6 +26,10 @@ class TranslateRequest(BaseModel):
     """Input for translating existing results to a new language."""
 
     language: str = Field(default="en", description="Target language: en | es | pt")
+    agents: list[AgentResult] | None = Field(
+        default=None,
+        description="Agent results to translate — required in real (non-demo) mode",
+    )
 
 
 class TranslateResponse(BaseModel):
