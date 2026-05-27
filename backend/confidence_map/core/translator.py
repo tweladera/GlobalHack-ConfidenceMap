@@ -89,36 +89,36 @@ async def _translate_agent(result: AgentResult, language: str) -> AgentResult:
         )
         text = next((block.text for block in response.content if hasattr(block, "text")), "")
         translated = _extract_json(text)
+
+        translated_map: dict[int, dict[str, Any]] = {
+            int(item["idx"]): item for item in translated.get("findings", [])
+        }
+
+        new_findings = []
+        for i, f in enumerate(result.findings):
+            t = translated_map.get(i, {})
+            new_findings.append(
+                f.model_copy(
+                    update={
+                        "title": t.get("title", f.title),
+                        "description": t.get("description", f.description),
+                        "evidence": t.get("evidence", f.evidence),
+                        "assumptions": t.get("assumptions", f.assumptions),
+                        "needs_validation": t.get("needs_validation", f.needs_validation),
+                        "recommended_action": t.get("recommended_action", f.recommended_action),
+                    }
+                )
+            )
+
+        return result.model_copy(
+            update={
+                "findings": new_findings,
+                "summary": translated.get("summary", result.summary),
+            }
+        )
     except Exception as exc:
         logger.warning("[translator] Failed to translate agent %s: %s", result.agent_id, exc)
         return result  # graceful fallback — show original language
-
-    translated_map: dict[int, dict[str, Any]] = {
-        int(item["idx"]): item for item in translated.get("findings", [])
-    }
-
-    new_findings = []
-    for i, f in enumerate(result.findings):
-        t = translated_map.get(i, {})
-        new_findings.append(
-            f.model_copy(
-                update={
-                    "title": t.get("title", f.title),
-                    "description": t.get("description", f.description),
-                    "evidence": t.get("evidence", f.evidence),
-                    "assumptions": t.get("assumptions", f.assumptions),
-                    "needs_validation": t.get("needs_validation", f.needs_validation),
-                    "recommended_action": t.get("recommended_action", f.recommended_action),
-                }
-            )
-        )
-
-    return result.model_copy(
-        update={
-            "findings": new_findings,
-            "summary": translated.get("summary", result.summary),
-        }
-    )
 
 
 async def translate_agent_results(agents: list[AgentResult], language: str) -> list[AgentResult]:
