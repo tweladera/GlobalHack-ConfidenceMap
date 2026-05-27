@@ -180,7 +180,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
 
     try:
         while True:
-            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=120.0)
+            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=100.0)
             if event is None:
                 break
 

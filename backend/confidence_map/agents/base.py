@@ -135,11 +135,12 @@ async def call_agent(
     try:
         response = await client.messages.create(
             model=settings.model,
-            max_tokens=4096,
+            max_tokens=2048,
             system=system_prompt + lang_instruction,
             messages=[{"role": "user", "content": user_prompt}],
             tools=[REPORT_FINDINGS_TOOL],
             tool_choice={"type": "any"},
+            timeout=90.0,
         )
     except anthropic.APIStatusError as exc:
         result.status = AgentStatus.ERROR
@@ -148,6 +149,10 @@ async def call_agent(
     except anthropic.APIError as exc:
         result.status = AgentStatus.ERROR
         result.error = f"API error: {exc.message}"
+        return result
+    except Exception as exc:
+        result.status = AgentStatus.ERROR
+        result.error = f"Agent timed out or failed: {exc}"
         return result
 
     findings = _extract_findings(response.content, agent_id=agent_id, agent_name=agent_name)
