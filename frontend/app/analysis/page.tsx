@@ -515,6 +515,8 @@ export default function AnalysisPage() {
               </div>
             </div>
           )}
+
+          <AccessibleSummary agents={agents} findings={allFindings} isComplete={isComplete} />
         </aside>
 
         {/* Text mode — full-width accessible document */}
@@ -841,8 +843,6 @@ export default function AnalysisPage() {
           )}
         </aside>}
       </main>
-
-      <AccessibleSummary agents={agents} findings={allFindings} isComplete={isComplete} />
 
       {showBacklog && (
         <BacklogModal findings={allFindings} onClose={() => setShowBacklog(false)} />
