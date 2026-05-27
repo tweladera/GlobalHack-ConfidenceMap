@@ -1,259 +1,259 @@
-// Caso de uso: NovaBank — Pagos Internacionales Instantáneos
-// Personajes: Sofia (PM), Daniel (Arquitecto), Priya (QA Lead), Marcus (Delivery Lead), Elena (Accesibilidad)
-// Contexto: 6 semanas, arquitectura legacy, presión regulatoria
+// Use case: NovaBank — International Instant Payments
+// Characters: Sofia (PM), Daniel (Architect), Priya (QA Lead), Marcus (Delivery Lead), Elena (Accessibility)
+// Context: 6 weeks, legacy architecture, regulatory pressure
 
-export const DEMO_SPEC = `# NovaBank — Pagos Internacionales Instantáneos
+export const DEMO_SPEC = `# NovaBank — International Instant Payments
 ## Product Requirements Document v1.2
 
-**Autor:** Sofia Chen, Product Manager
-**Revisado por:** Daniel Reyes, Arquitecto de Software
-**Estado:** En revisión
-**Objetivo de entrega:** 6 semanas
+**Author:** Sofia Chen, Product Manager
+**Reviewed by:** Daniel Reyes, Software Architect
+**Status:** Under review
+**Delivery target:** 6 weeks
 
 ---
 
-## Contexto de negocio
+## Business context
 
-NovaBank necesita lanzar pagos internacionales instantáneos para clientes corporativos en LATAM.
-La regulación local exige confirmación de transacción en menos de 10 segundos.
-El producto competirá directamente con Wise y Remitly en el segmento B2B.
-Se proyecta un crecimiento de 300% en volumen transaccional en los primeros 6 meses.
-
----
-
-## Alcance del MVP
-
-### US-001: Iniciar pago internacional
-Como cliente corporativo, 
-quiero iniciar un pago internacional desde mi dashboard
-para transferir fondos a proveedores en el extranjero.
-
-**Criterios de aceptación:**
-- El usuario ingresa: monto, moneda destino, cuenta IBAN/SWIFT del beneficiario
-- El sistema valida los fondos disponibles antes de procesar
-- Se muestra confirmación de la transacción al usuario
-- El pago debe completarse dentro del SLA regulatorio
-
-**Notas técnicas:**
-- El procesamiento pasa por el gateway SWIFT legado de NovaBank (CoreBanking v2.1)
-- La validación antifraude es obligatoria antes de ejecutar
-
-### US-002: Consultar estado del pago
-Como cliente, quiero consultar el estado de un pago en tiempo real
-para saber si fue procesado correctamente.
-
-**Criterios de aceptación:**
-- El usuario puede ver: pendiente, procesando, completado, fallido
-- El estado se actualiza automáticamente sin refrescar la página
-- Se muestra el tiempo estimado de acreditación en cuenta destino
-
-### US-003: Notificación de resultado
-Como cliente, quiero recibir una notificación cuando mi pago sea procesado
-para confirmar que la operación fue exitosa.
-
-**Criterios de aceptación:**
-- Notificación in-app inmediata al cambiar el estado
-- Email de confirmación con comprobante en PDF
-- En caso de fallo, el sistema debe indicar qué hacer a continuación
-
-### US-004: Historial de transacciones
-Como cliente, quiero ver el historial completo de mis pagos internacionales
-para conciliar con mi contabilidad.
-
-**Criterios de aceptación:**
-- Listado paginado de transacciones
-- Filtros por fecha, estado y monto
-- Exportación a CSV
+NovaBank needs to launch international instant payments for corporate clients in LATAM.
+Local regulations require transaction confirmation in under 10 seconds.
+The product will compete directly with Wise and Remitly in the B2B segment.
+Projected growth of 300% in transaction volume in the first 6 months.
 
 ---
 
-## Restricciones técnicas conocidas
+## MVP scope
 
-- El gateway SWIFT CoreBanking v2.1 es un sistema síncrono que puede tener latencias de 2-15 segundos
-- El sistema antifraude externo (FraudShield) responde en promedio en 3 segundos
-- La base de datos de cuentas está en Oracle 11g (no soporta transacciones distribuidas modernas)
-- Infraestructura actual: on-premise, sin Kubernetes, despliegue manual
+### US-001: Initiate international payment
+As a corporate client,
+I want to initiate an international payment from my dashboard
+to transfer funds to suppliers abroad.
 
-## Requisitos no funcionales
+**Acceptance criteria:**
+- The user enters: amount, destination currency, beneficiary IBAN/SWIFT account
+- The system validates available funds before processing
+- Transaction confirmation is displayed to the user
+- The payment must complete within the regulatory SLA
 
-- Alta disponibilidad: el sistema debe estar disponible 99.9% del tiempo
-- El SLA regulatorio exige confirmación en menos de 10 segundos
-- Soporte para picos de hasta 500 transacciones por minuto en días de cierre contable
+**Technical notes:**
+- Processing goes through NovaBank's legacy SWIFT gateway (CoreBanking v2.1)
+- Anti-fraud validation is mandatory before execution
 
-## Seguridad y compliance
+### US-002: Query payment status
+As a client, I want to check the status of a payment in real time
+to know if it was processed correctly.
 
-- Todas las transacciones deben quedar auditadas con trazabilidad completa
-- Cumplimiento con PCI-DSS nivel 1
-- Los datos de cuenta SWIFT/IBAN no pueden almacenarse en texto plano
+**Acceptance criteria:**
+- The user can see: pending, processing, completed, failed
+- Status updates automatically without refreshing the page
+- Estimated crediting time to the destination account is displayed
 
-## Fuera de alcance
+### US-003: Result notification
+As a client, I want to receive a notification when my payment is processed
+to confirm that the operation was successful.
 
-- Pagos en criptomonedas
-- Integración con contabilidades externas (ERP)
-- Soporte multiidioma (solo español para el MVP)`;
+**Acceptance criteria:**
+- Immediate in-app notification when status changes
+- Confirmation email with PDF receipt
+- In case of failure, the system must indicate what to do next
 
-export const DEMO_SPEC_AUTH = `# NovaBank — Sistema de Autenticación Multi-Factor (MFA)
+### US-004: Transaction history
+As a client, I want to see the complete history of my international payments
+to reconcile with my accounting.
+
+**Acceptance criteria:**
+- Paginated list of transactions
+- Filters by date, status, and amount
+- Export to CSV
+
+---
+
+## Known technical constraints
+
+- The CoreBanking v2.1 SWIFT gateway is a synchronous system with latencies of 2-15 seconds
+- The external anti-fraud system (FraudShield) responds on average in 3 seconds
+- The accounts database is on Oracle 11g (does not support modern distributed transactions)
+- Current infrastructure: on-premise, no Kubernetes, manual deployment
+
+## Non-functional requirements
+
+- High availability: the system must be available 99.9% of the time
+- Regulatory SLA requires confirmation in under 10 seconds
+- Support for peaks of up to 500 transactions per minute on accounting close days
+
+## Security and compliance
+
+- All transactions must be audited with full traceability
+- PCI-DSS Level 1 compliance
+- SWIFT/IBAN account data cannot be stored in plain text
+
+## Out of scope
+
+- Cryptocurrency payments
+- Integration with external accounting systems (ERP)
+- Multi-language support (English only for MVP)`;
+
+export const DEMO_SPEC_AUTH = `# NovaBank — Multi-Factor Authentication (MFA) System
 ## Product Requirements Document v0.9
 
-**Autor:** Rodrigo Salazar, Product Manager
-**Revisado por:** Daniel Reyes, Arquitecto de Software
-**Estado:** Borrador para revisión técnica
-**Objetivo de entrega:** 8 semanas (deadline regulatorio: 1 de julio)
+**Author:** Rodrigo Salazar, Product Manager
+**Reviewed by:** Daniel Reyes, Software Architect
+**Status:** Draft for technical review
+**Delivery target:** 8 weeks (regulatory deadline: July 1st)
 
 ---
 
-## Contexto de negocio
+## Business context
 
-NovaBank debe implementar autenticación multi-factor obligatoria para todos los clientes corporativos antes del plazo regulatorio de Q2. La regulación local exige MFA para acceso a funcionalidades de transferencias a partir del 1 de julio. El equipo de seguridad detectó 3 intentos de acceso no autorizado en los últimos 90 días.
-
----
-
-## Alcance del MVP
-
-### US-101: Registro de segundo factor
-Como cliente corporativo, quiero registrar un segundo factor de autenticación para proteger mi cuenta.
-
-**Criterios de aceptación:**
-- El usuario puede registrar una app de autenticación (TOTP)
-- El usuario puede registrar su número de teléfono para SMS OTP como alternativa
-- Se generan 8 códigos de recuperación al activar el segundo factor
-- El sistema valida el segundo factor antes de activarlo
-
-**Notas técnicas:**
-- Los códigos TOTP siguen el estándar RFC 6238 (ventana de 30 segundos)
-- El número de teléfono actúa como fallback ante pérdida de la app autenticadora
-- Los códigos de recuperación son de uso único
-
-### US-102: Autenticación con segundo factor
-Como cliente, quiero autenticarme con mi segundo factor para acceder a mi cuenta de forma segura.
-
-**Criterios de aceptación:**
-- Después del login con usuario/contraseña, se solicita el segundo factor
-- El usuario puede ingresar código TOTP de 6 dígitos o OTP de SMS
-- Se permite un máximo de 3 intentos incorrectos antes de bloquear la sesión temporalmente
-- La sesión MFA tiene privilegios superiores a la sesión sin MFA
-
-**Notas técnicas:**
-- El JWT resultante incluye el claim \`mfa_verified: true\`
-- La ventana de validez del OTP de SMS es de 10 minutos
-
-### US-103: Gestión de dispositivos confiables
-Como cliente, quiero marcar un dispositivo como confiable para no repetir el MFA en cada sesión.
-
-**Criterios de aceptación:**
-- El usuario puede marcar el dispositivo actual como confiable por 30 días
-- Los dispositivos confiables se listan en la configuración de cuenta
-- El usuario puede revocar dispositivos confiables individualmente
-
-### US-104: Recuperación de cuenta
-Como cliente, quiero recuperar el acceso si pierdo mi segundo factor.
-
-**Criterios de aceptación:**
-- El usuario puede autenticarse con los códigos de recuperación generados en el registro
-- Tras usar un código de recuperación, se requiere registrar un nuevo segundo factor
-- El administrador corporativo puede resetear el MFA de un usuario con aprobación del equipo de seguridad
+NovaBank must implement mandatory multi-factor authentication for all corporate clients before the Q2 regulatory deadline. Local regulations require MFA for access to transfer features starting July 1st. The security team detected 3 unauthorized access attempts in the last 90 days.
 
 ---
 
-## Restricciones técnicas conocidas
+## MVP scope
 
-- El sistema de autenticación actual usa JWTs almacenados en localStorage del browser
-- El servicio de SMS es Twilio; se ha observado latencia variable de 5-30 segundos en algunos mercados LATAM
-- La autenticación biométrica fue evaluada y descartada para el MVP por complejidad de integración
-- El backend de auth es parte de un monolito Node.js sin separación de servicios
+### US-101: Second factor registration
+As a corporate client, I want to register a second authentication factor to protect my account.
 
-## Requisitos no funcionales
+**Acceptance criteria:**
+- The user can register an authenticator app (TOTP)
+- The user can register their phone number for SMS OTP as an alternative
+- 8 recovery codes are generated when the second factor is activated
+- The system validates the second factor before activating it
 
-- El flujo MFA no debe agregar más de 10 segundos al tiempo total de login
-- Alta disponibilidad: el sistema de autenticación requiere 99.95% de uptime
-- Todos los intentos de login deben loguearse con IP, user-agent y timestamp
+**Technical notes:**
+- TOTP codes follow RFC 6238 standard (30-second window)
+- The phone number acts as a fallback if the authenticator app is lost
+- Recovery codes are single-use
 
-## Seguridad y compliance
+### US-102: Authentication with second factor
+As a client, I want to authenticate with my second factor to access my account securely.
 
-- Cumplimiento con OWASP Authentication Cheat Sheet
-- Los seeds TOTP y códigos de recuperación no pueden almacenarse en texto plano
-- Se requiere rate limiting en los endpoints de login y verificación MFA
-- Toda actividad de autenticación debe quedar auditada
+**Acceptance criteria:**
+- After login with username/password, the second factor is requested
+- The user can enter a 6-digit TOTP code or SMS OTP
+- A maximum of 3 incorrect attempts is allowed before temporarily blocking the session
+- The MFA session has higher privileges than a non-MFA session
 
-## Fuera de alcance
+**Technical notes:**
+- The resulting JWT includes the claim \`mfa_verified: true\`
+- The SMS OTP validity window is 10 minutes
 
-- Autenticación biométrica (planificada para Q3)
-- SSO/SAML para clientes enterprise
+### US-103: Trusted device management
+As a client, I want to mark a device as trusted to avoid repeating MFA every session.
+
+**Acceptance criteria:**
+- The user can mark the current device as trusted for 30 days
+- Trusted devices are listed in account settings
+- The user can revoke trusted devices individually
+
+### US-104: Account recovery
+As a client, I want to recover access if I lose my second factor.
+
+**Acceptance criteria:**
+- The user can authenticate with the recovery codes generated during registration
+- After using a recovery code, a new second factor must be registered
+- The corporate administrator can reset a user's MFA with security team approval
+
+---
+
+## Known technical constraints
+
+- The current authentication system uses JWTs stored in browser localStorage
+- The SMS service is Twilio; variable latency of 5-30 seconds has been observed in some LATAM markets
+- Biometric authentication was evaluated and rejected for MVP due to integration complexity
+- The auth backend is part of a Node.js monolith without service separation
+
+## Non-functional requirements
+
+- The MFA flow must not add more than 10 seconds to the total login time
+- High availability: the authentication system requires 99.95% uptime
+- All login attempts must be logged with IP, user-agent, and timestamp
+
+## Security and compliance
+
+- OWASP Authentication Cheat Sheet compliance
+- TOTP seeds and recovery codes cannot be stored in plain text
+- Rate limiting is required on login and MFA verification endpoints
+- All authentication activity must be audited
+
+## Out of scope
+
+- Biometric authentication (planned for Q3)
+- SSO/SAML for enterprise clients
 - Hardware security keys (FIDO2/WebAuthn)`;
 
-export const DEMO_ARCH_AUTH = `# Arquitectura Propuesta — NovaBank MFA
-## Autor: Daniel Reyes, Arquitecto de Software
+export const DEMO_ARCH_AUTH = `# Proposed Architecture — NovaBank MFA
+## Author: Daniel Reyes, Software Architect
 
-### Componentes principales
-
-**Frontend:**
-- Formulario MFA integrado en el flujo de login existente
-- JWTs almacenados en localStorage (sin cambio respecto al sistema actual)
-- Sin expiración de sesión por inactividad implementada
-- Los códigos de recuperación se muestran una sola vez; responsabilidad del usuario guardarlos
-
-**Auth Service (Node.js, monolito existente):**
-- Se agrega endpoint POST /auth/mfa/verify para verificar TOTP/OTP
-- Generación de seeds TOTP con librería \`speakeasy\` (sin auditoría de seguridad externa)
-- Seeds TOTP almacenados cifrados con AES-128; clave de cifrado hardcodeada en .env
-- Sin invalidación de sesiones activas existentes al activar o cambiar configuración MFA
-- Sin detección de replay attacks en OTP de SMS
-
-**Servicio de SMS (Twilio):**
-- OTP enviado en texto plano en el cuerpo del SMS: "Tu código NovaBank es: 123456"
-- Sin límite de reenvíos del SMS OTP por intento de login
-- Latencia variable 5-30s en LATAM; sin timeout configurable desde el Auth Service
-- Sin fallback si Twilio no está disponible (el usuario queda bloqueado)
-
-**Base de datos:**
-- PostgreSQL para tokens MFA, dispositivos confiables y códigos de recuperación
-- Códigos de recuperación almacenados hasheados con MD5
-- Sin rotación de la clave AES planificada
-
-**Dispositivos confiables:**
-- Token de dispositivo es un UUID almacenado en cookie sin flag httpOnly
-- Sin binding del token al dispositivo (user-agent, IP) — el mismo token funciona desde cualquier equipo
-- Expiración fija a 30 días, sin opción de configuración por el administrador`;
-
-export const DEMO_ARCHITECTURE = `# Arquitectura Propuesta — NovaBank Pagos Internacionales
-## Autor: Daniel Reyes, Arquitecto de Software
-
-### Componentes principales
+### Main components
 
 **Frontend:**
-- React SPA con polling cada 3 segundos para actualizar estado de pagos
-- Sin WebSockets (decisión de simplificación para MVP)
-- Diseñado principalmente para escritorio; móvil como mejora futura
+- MFA form integrated into the existing login flow
+- JWTs stored in localStorage (no change from current system)
+- No session expiration on inactivity implemented
+- Recovery codes displayed only once; user responsible for saving them
+
+**Auth Service (Node.js, existing monolith):**
+- Adding endpoint POST /auth/mfa/verify to verify TOTP/OTP
+- TOTP seed generation with \`speakeasy\` library (no external security audit)
+- TOTP seeds stored encrypted with AES-128; encryption key hardcoded in .env
+- No invalidation of existing active sessions when activating or changing MFA settings
+- No replay attack detection for SMS OTP
+
+**SMS Service (Twilio):**
+- OTP sent in plain text in the SMS body: "Your NovaBank code is: 123456"
+- No limit on SMS OTP resends per login attempt
+- Variable latency 5-30s in LATAM; no configurable timeout from Auth Service
+- No fallback if Twilio is unavailable (user is locked out)
+
+**Database:**
+- PostgreSQL for MFA tokens, trusted devices, and recovery codes
+- Recovery codes stored hashed with MD5
+- No AES key rotation planned
+
+**Trusted devices:**
+- Device token is a UUID stored in a cookie without httpOnly flag
+- No binding of the token to the device (user-agent, IP) — the same token works from any machine
+- Fixed 30-day expiration with no admin configuration option`;
+
+export const DEMO_ARCHITECTURE = `# Proposed Architecture — NovaBank International Payments
+## Author: Daniel Reyes, Software Architect
+
+### Main components
+
+**Frontend:**
+- React SPA with polling every 3 seconds to update payment status
+- No WebSockets (simplification decision for MVP)
+- Designed primarily for desktop; mobile as a future enhancement
 
 **API Gateway:**
-- Node.js + Express, instancia única
-- Maneja autenticación JWT y enrutamiento
-- Sin rate limiting implementado aún
+- Node.js + Express, single instance
+- Handles JWT authentication and routing
+- No rate limiting implemented yet
 
 **Payment Service:**
 - Python + FastAPI
-- Llama síncronamente al CoreBanking gateway en cada transacción
-- Llama síncronamente a FraudShield antes de autorizar
-- Sin timeout configurado para llamadas al CoreBanking (usa el default del cliente HTTP)
-- Sin lógica de retry implementada
+- Calls CoreBanking gateway synchronously on each transaction
+- Calls FraudShield synchronously before authorizing
+- No timeout configured for CoreBanking calls (uses HTTP client default)
+- No retry logic implemented
 
 **CoreBanking Gateway (legacy):**
-- Sistema SWIFT propio, on-premise
-- API REST síncrona con latencia variable (2-15 segundos)
-- Sin SLA interno documentado
-- Punto único de integración para todos los pagos
+- Proprietary SWIFT system, on-premise
+- Synchronous REST API with variable latency (2-15 seconds)
+- No internal SLA documented
+- Single point of integration for all payments
 
-**Base de datos:**
-- PostgreSQL para datos del Payment Service
-- Oracle 11g para datos de cuentas (solo lectura desde el nuevo sistema)
-- Sin mecanismo de idempotencia implementado en las transacciones
+**Database:**
+- PostgreSQL for Payment Service data
+- Oracle 11g for account data (read-only from the new system)
+- No idempotency mechanism implemented for transactions
 
-**Notificaciones:**
-- Llamada directa a SendGrid desde el Payment Service al completar cada transacción
-- Sin cola de mensajes
-- Sin retry en caso de fallo de SendGrid
+**Notifications:**
+- Direct call to SendGrid from the Payment Service on each transaction completion
+- No message queue
+- No retry on SendGrid failure
 
-**Infraestructura:**
-- Despliegue en VMs on-premise
-- Sin orquestación de contenedores
-- Escalamiento manual`;
+**Infrastructure:**
+- Deployed on on-premise VMs
+- No container orchestration
+- Manual scaling`;

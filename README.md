@@ -1,69 +1,69 @@
 # Confidence Map
 
-**Plataforma de inteligencia para arquitectura y delivery de software basada en IA multiagente.**
+**Multi-agent AI platform for software architecture and delivery intelligence.**
 
-Confidence Map analiza especificaciones de software con seis agentes especializados que trabajan en paralelo, generando un mapa visual de decisiones, riesgos e incertidumbres con niveles de confianza explícitos.
-
----
-
-## El problema que resuelve
-
-Los equipos de ingeniería:
-- Trabajan con especificaciones ambiguas sin saberlo
-- Toman decisiones arquitectónicas sin trazabilidad
-- Descubren riesgos demasiado tarde en el ciclo de entrega
-- Dependen de herramientas de IA que responden sin explicar su razonamiento
-
-Confidence Map hace el razonamiento **visible** y **accesible** para todos.
+Confidence Map analyzes software specifications with six specialized agents working in parallel, generating a visual map of decisions, risks, and uncertainties with explicit confidence levels.
 
 ---
 
-## Diferenciador
+## The Problem It Solves
 
-> No es un chatbot. No es un copiloto. No es un generador de código.
-> Es un **sistema de razonamiento visible** para ingeniería y delivery.
+Engineering teams:
+- Work with ambiguous specifications without knowing it
+- Make architectural decisions without traceability
+- Discover risks too late in the delivery cycle
+- Rely on AI tools that answer without explaining their reasoning
 
-Cada respuesta incluye:
-- Qué sabe con certeza
-- Qué infiere razonablemente
-- Qué asume
-- Qué contradicciones encontró
-- Qué necesita validación
+Confidence Map makes reasoning **visible** and **accessible** to everyone.
 
 ---
 
-## Los seis agentes
+## Differentiator
 
-| Agente | Función |
-|--------|---------|
-| **Spec Analyst** | Detecta ambigüedad, contradicciones y requisitos incompletos |
-| **Architecture Validator** | Valida arquitectura, coupling peligroso y drift |
-| **Risk Intelligence** | Seguridad, riesgos de delivery y observabilidad |
-| **Business Impact** | Costo cloud, velocidad de delivery y riesgo regulatorio |
-| **Accessibility Advocate** | WCAG 2.1 AA, lectores de pantalla, navegación por teclado |
-| **Delivery Historian** | Patrones históricos y post-mortems de la industria |
+> It is not a chatbot. Not a copilot. Not a code generator.
+> It is a **visible reasoning system** for engineering and delivery.
 
----
-
-## Mapa de confianza
-
-El mapa es la estrella visual de la plataforma.
-
-| Nivel | Color | Significado |
-|-------|-------|-------------|
-| **Verde** | 🟢 | Explícitamente definido en la especificación |
-| **Amarillo** | 🟡 | Inferido razonablemente del contexto |
-| **Rojo** | 🔴 | Alta incertidumbre, contradicción o faltante |
+Every response includes:
+- What it knows for certain
+- What it reasonably infers
+- What it assumes
+- What contradictions it found
+- What needs validation
 
 ---
 
-## Arquitectura técnica
+## The Six Agents
+
+| Agent | Function |
+|-------|----------|
+| **Spec Analyst** | Detects ambiguity, contradictions, and incomplete requirements |
+| **Architecture Validator** | Validates architecture, dangerous coupling, and drift |
+| **Risk Intelligence** | Security, delivery risks, and observability gaps |
+| **Business Impact** | Cloud cost, delivery velocity, and regulatory risk |
+| **Accessibility Advocate** | WCAG 2.1 AA, screen readers, keyboard navigation |
+| **Delivery Historian** | Historical patterns and industry post-mortems |
+
+---
+
+## The Confidence Map
+
+The visual map is the star of the platform.
+
+| Level | Color | Meaning |
+|-------|-------|---------|
+| **Green** | 🟢 | Explicitly defined in the specification |
+| **Yellow** | 🟡 | Reasonably inferred from context |
+| **Red** | 🔴 | High uncertainty, contradiction, or missing |
+
+---
+
+## Technical Architecture
 
 ```
 ┌─────────────────────────────────┐
-│         Frontend (Next.js)      │
+│         Frontend (Next.js 15)   │
 │   React Flow · Tailwind CSS     │
-│   Accessibility first           │
+│   i18n EN/ES/PT · WCAG 2.1 AA  │
 └──────────────┬──────────────────┘
                │ SSE streaming
 ┌──────────────▼──────────────────┐
@@ -72,87 +72,87 @@ El mapa es la estrella visual de la plataforma.
 └──────────────┬──────────────────┘
                │
 ┌──────────────▼──────────────────┐
-│    Orquestador (asyncio)        │
-│   Spec Analyst (fase 1)         │
-│   5 agentes en paralelo         │
+│    Orchestrator (asyncio)       │
+│   Spec Analyst (sequential)     │
+│   5 agents in parallel          │
 └──────────────┬──────────────────┘
                │
 ┌──────────────▼──────────────────┐
 │   Anthropic API (Claude)        │
 │   claude-sonnet-4-6             │
-│   Tool use estructurado         │
+│   Structured tool use           │
 └─────────────────────────────────┘
 ```
 
 ---
 
-## Estructura del repositorio
+## Repository Structure
 
 ```
 confidence-map/
-├── backend/              # API FastAPI + 6 agentes
-│   ├── confidence_map/   # Paquete principal Python
-│   ├── tests/            # pytest · 42 tests · ≥80% cobertura
+├── backend/              # FastAPI + 6 agents
+│   ├── confidence_map/   # Main Python package
+│   ├── tests/            # pytest · 42 tests · ≥80% coverage
 │   └── pyproject.toml    # uv · mypy · ruff · pytest
 ├── frontend/             # Next.js 15 App Router
-│   ├── app/              # Páginas
-│   └── components/       # Componentes React
-├── docs/                 # Arquitectura de referencia y documentos
-├── QUICKSTART.md         # Guía de inicio rápido
-└── PLAN.md               # Plan de trabajo por fases
+│   ├── app/              # Pages
+│   └── components/       # React components
+├── docs/                 # Architecture reference and proposal
+├── QUICKSTART.md         # Quick start guide
+└── CHANGELOG.md          # Version history
 ```
 
 ---
 
-## Inicio rápido
+## Quick Start
 
-Consulta [QUICKSTART.md](./QUICKSTART.md) para instrucciones completas.
+See [QUICKSTART.md](./QUICKSTART.md) for full instructions.
 
 ```bash
-# Backend
-cd backend && uv run uvicorn confidence_map.main:app --reload
+# Option 1: Makefile (recommended)
+make setup && make demo
 
-# Frontend
+# Option 2: Manual
+cd backend && uv run uvicorn confidence_map.main:app --reload
 cd frontend && pnpm dev
 ```
 
 ---
 
-## Estado del proyecto
+## Project Status
 
-**Demo completo — Fases 1–5 implementadas.**
+**Full demo — Phases 0–5 implemented.**
 
-- DEMO_MODE: análisis sin API key, $0 costo
-- Mapa visual con animaciones en tiempo real
-- Tabla de decisiones filtrable
-- Modo texto accesible (WCAG 2.1 AA)
-- Dos specs de demo: NovaBank Pagos + Auth MFA
-- URL compartible con `?spec=pagos|auth`
-
-Ver [PLAN.md](./PLAN.md) para el roadmap completo.
+- DEMO_MODE: analysis without API key, $0 cost
+- Visual map with real-time animations
+- Filterable decision table
+- Accessible text mode (WCAG 2.1 AA)
+- Two demo specs: NovaBank Payments + Auth MFA
+- Shareable URL with `?spec=payments|auth`
+- Multi-language support: English, Spanish, Portuguese (BR)
 
 ---
 
-## Stack tecnológico
+## Technology Stack
 
-| Capa | Tecnología |
-|------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | Backend | Python 3.12, FastAPI, uv |
-| IA | Anthropic SDK, Claude Sonnet 4.6 |
-| Tipado | mypy --strict, Pydantic v2 |
-| Tests | pytest, pytest-asyncio, 42 tests, cobertura ≥80% |
+| AI | Anthropic SDK, Claude Sonnet 4.6 |
+| Type safety | mypy --strict, Pydantic v2 |
+| Tests | pytest, pytest-asyncio, 42 tests, coverage ≥80% |
 | Frontend | Next.js 15, TypeScript strict |
-| Gestor de paquetes | pnpm 10 |
-| Visualización | React Flow, dagre layout |
-| Estilos | Tailwind CSS |
+| Package manager | pnpm 10 |
+| Visualization | React Flow, dagre layout |
+| Styles | Tailwind CSS |
+| i18n | React Context + JSON messages (EN/ES/PT) |
 
 ---
 
-## Principios de desarrollo
+## Development Principles
 
-Este proyecto sigue una [constitución](./.specify/memory/constitution.md) que establece:
-- Tipado estático estricto (Python 3.12+, TypeScript strict)
-- Tests obligatorios con cobertura mínima del 80%
-- Gestión de dependencias: `uv` (backend) · `pnpm` (frontend)
-- Accesibilidad WCAG 2.1 AA como requisito de producción
-- Código limpio y mínimo (YAGNI)
+- Strict static typing (Python 3.12+, TypeScript strict)
+- Mandatory tests with minimum 80% coverage
+- Dependency management: `uv` (backend) · `pnpm` (frontend)
+- WCAG 2.1 AA accessibility as a production requirement
+- Clean and minimal code (YAGNI)

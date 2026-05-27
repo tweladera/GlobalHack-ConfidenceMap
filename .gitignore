@@ -64,3 +64,8 @@ ehthumbs.db
 *.log
 logs/
 .claude/settings.local.json
+
+# ── Local-only files (kept locally, not tracked in repo) ─────────────────────
+STATUS.md
+PLAN.md
+docs/Confidence_Map_*.pdf

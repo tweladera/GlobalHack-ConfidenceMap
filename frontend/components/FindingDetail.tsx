@@ -2,6 +2,7 @@
 
 import type { Finding } from "@/types";
 import { CONFIDENCE_COLORS, CONFIDENCE_LABELS } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface FindingDetailProps {
   finding: Finding;
@@ -11,6 +12,7 @@ interface FindingDetailProps {
 export default function FindingDetail({ finding, onClose }: FindingDetailProps) {
   const colors = CONFIDENCE_COLORS[finding.confidence];
   const score = Math.round(finding.confidence_score * 100);
+  const { t } = useI18n();
 
   return (
     <section
@@ -71,7 +73,7 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
         {finding.evidence && (
           <div>
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Evidence
+              {t("finding.evidence")}
             </h4>
             <blockquote className="border-l-2 border-surface-border pl-3 text-slate-400 italic text-xs leading-relaxed">
               {finding.evidence}
@@ -83,7 +85,7 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
         {finding.assumptions.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Assumptions
+              {t("finding.assumptions")}
             </h4>
             <ul className="space-y-1" aria-label="Assumptions made">
               {finding.assumptions.map((a, i) => (
@@ -100,7 +102,7 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
         {finding.needs_validation.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Needs validation
+              {t("finding.needs_validation")}
             </h4>
             <ul className="space-y-1" aria-label="Items needing validation">
               {finding.needs_validation.map((v, i) => (
@@ -117,7 +119,7 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
         {finding.recommended_action && (
           <div>
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Qué hacer
+              {t("finding.what_to_do")}
             </h4>
             <p className="text-xs text-slate-200 leading-relaxed bg-accent-dim border border-accent/30 rounded-lg px-3 py-2">
               {finding.recommended_action}
