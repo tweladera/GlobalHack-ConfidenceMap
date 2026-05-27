@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncGenerator, Coroutine
 from typing import Any, Protocol
 
@@ -20,13 +21,15 @@ from confidence_map.models.analysis import AnalysisRequest, ConfidenceDistributi
 from confidence_map.models.events import SSEEvent, SSEEventType
 from confidence_map.models.findings import AgentResult
 
+logger = logging.getLogger(__name__)
+
 
 class _AgentModule(Protocol):
     AGENT_ID: str
     AGENT_NAME: str
 
     def run(
-        self, spec: str, architecture: str, context: str
+        self, spec: str, architecture: str, context: str, language: str
     ) -> Coroutine[Any, Any, AgentResult]: ...
 
 
@@ -48,9 +51,9 @@ _PHASE2_AGENTS = [
 ]
 
 
-async def _stream_mock_analysis() -> AsyncGenerator[SSEEvent, None]:
+async def _stream_mock_analysis(language: str = "en") -> AsyncGenerator[SSEEvent, None]:
     """Emit pre-generated NovaBank mock results with simulated timing."""
-    mock_results = get_mock_results()
+    mock_results = get_mock_results(language)
     queue: asyncio.Queue[SSEEvent | None] = asyncio.Queue()
 
     async def emit_agent(agent_id: str) -> None:
@@ -123,7 +126,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
     Phase 2: Five remaining agents run concurrently via asyncio.gather.
     """
     if get_settings().demo_mode:
-        async for mock_event in _stream_mock_analysis():
+        async for mock_event in _stream_mock_analysis(request.language):
             yield mock_event
         return
 
@@ -134,14 +137,18 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         agent_id: str,
         agent_name: str,
     ) -> None:
+        logger.info("[orchestrator] Putting AGENT_START for %s", agent_id)
         await queue.put(
             SSEEvent(type=SSEEventType.AGENT_START, agent_id=agent_id, agent_name=agent_name)
         )
+        logger.info("[orchestrator] Calling agent %s", agent_id)
         result: AgentResult = await agent_module.run(
             spec=request.spec,
             architecture=request.architecture,
             context=request.context,
+            language=request.language,
         )
+        logger.info("[orchestrator] Agent %s done, status=%s", agent_id, result.status)
         event_type = (
             SSEEventType.AGENT_COMPLETE
             if result.error is None
@@ -172,6 +179,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         )
         await queue.put(None)  # sentinel
 
+    logger.info("[orchestrator] Starting real-mode analysis, creating orchestrate task")
     task = asyncio.create_task(orchestrate())
     dist = ConfidenceDistribution()
     total_findings = 0
@@ -179,9 +187,11 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
 
     try:
         while True:
-            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=120.0)
+            logger.info("[orchestrator] Waiting for next event from queue...")
+            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=130.0)
             if event is None:
                 break
+            logger.info("[orchestrator] Got event: %s", event.type)
 
             if event.type == SSEEventType.AGENT_COMPLETE and event.result:
                 for f in event.result.get("findings", []):

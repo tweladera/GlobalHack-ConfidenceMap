@@ -49,8 +49,6 @@ class TestGlobalConfidenceScore:
         mock_module.AGENT_NAME = "Spec Analyst"
         mock_module.run = AsyncMock(side_effect=fake_run)
 
-        agents = [mock_module] * 6  # 6 identical mocks for simplicity
-
         from confidence_map.core.orchestrator import stream_analysis
 
         mock_settings = type("S", (), {"demo_mode": False})()
@@ -68,7 +66,7 @@ class TestGlobalConfidenceScore:
 
         complete = next(e for e in events if e.type == SSEEventType.ANALYSIS_COMPLETE)
         assert complete.global_confidence_score is not None
-        # 6 agents × 3 findings each = 18 findings, avg of (1.0,0.5,0.0) repeated = 0.5
+        # 6 agents x 3 findings each = 18 findings, avg of (1.0,0.5,0.0) repeated = 0.5
         assert abs(complete.global_confidence_score - 0.5) < 0.01
 
     async def test_score_is_none_equivalent_when_no_findings(self) -> None:

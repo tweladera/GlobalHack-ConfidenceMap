@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient

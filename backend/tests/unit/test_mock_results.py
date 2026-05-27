@@ -8,7 +8,6 @@ from confidence_map.core.mock_results import AGENT_DELAYS, get_mock_results
 from confidence_map.models.events import SSEEventType
 from confidence_map.models.findings import AgentStatus, ConfidenceLevel
 
-
 _ALL_AGENT_IDS = {
     "spec_analyst",
     "arch_validator",
@@ -40,14 +39,16 @@ class TestGetMockResults:
         for agent_id, result in get_mock_results().items():
             for finding in result.findings:
                 assert finding.confidence in valid, (
-                    f"{agent_id} finding '{finding.title}' has invalid confidence: {finding.confidence}"
+                    f"{agent_id} finding '{finding.title}'"
+                    f" has invalid confidence: {finding.confidence}"
                 )
 
     def test_all_scores_in_range(self) -> None:
         for agent_id, result in get_mock_results().items():
             for finding in result.findings:
                 assert 0.0 <= finding.confidence_score <= 1.0, (
-                    f"{agent_id} finding '{finding.title}' score out of range: {finding.confidence_score}"
+                    f"{agent_id} finding '{finding.title}'"
+                    f" score out of range: {finding.confidence_score}"
                 )
 
     def test_each_result_has_summary(self) -> None:

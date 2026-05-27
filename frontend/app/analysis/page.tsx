@@ -9,6 +9,8 @@ import AccessibleSummary from "@/components/AccessibleSummary";
 import DecisionTable from "@/components/DecisionTable";
 import type { AgentState, Finding, SSEEvent } from "@/types";
 import { AGENT_DEFINITIONS } from "@/types";
+import { useI18n } from "@/lib/i18n";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 // React Flow must be loaded client-side only (no SSR)
 const ConfidenceMap = dynamic(() => import("@/components/ConfidenceMap"), {
@@ -29,6 +31,7 @@ const INITIAL_AGENTS: AgentState[] = AGENT_DEFINITIONS.map((a) => ({
 
 export default function AnalysisPage() {
   const router = useRouter();
+  const { t, lang } = useI18n();
   const [agents, setAgents] = useState<AgentState[]>(INITIAL_AGENTS);
   const [allFindings, setAllFindings] = useState<Finding[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
@@ -41,9 +44,12 @@ export default function AnalysisPage() {
   const [textMode, setTextMode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Prevents translation from firing on the initial analysis_complete event
+  const analysisJustCompletedRef = useRef(false);
 
   const announce = (text: string) => {
     // Clear → re-set so screen readers fire a new announcement even if text is similar
@@ -83,7 +89,7 @@ export default function AnalysisPage() {
 
       if (event.type === "agent_start" && event.agent_id) {
         const agentName = event.agent_name ?? event.agent_id;
-        announce(`${agentName} ha iniciado el análisis.`);
+        announce(`${agentName} has started analysis.`);
         setAgents((prev) =>
           prev.map((a) =>
             a.agent_id === event.agent_id ? { ...a, status: "running" } : a
@@ -94,7 +100,7 @@ export default function AnalysisPage() {
       if (event.type === "agent_complete" && event.agent_id && event.result) {
         const result = event.result;
         announce(
-          `${result.agent_name} ha completado el análisis con ${result.findings.length} hallazgo${result.findings.length !== 1 ? "s" : ""}. ${result.summary}`
+          `${result.agent_name} has completed analysis with ${result.findings.length} finding${result.findings.length !== 1 ? "s" : ""}. ${result.summary}`
         );
         setAgents((prev) =>
           prev.map((a) =>
@@ -124,6 +130,7 @@ export default function AnalysisPage() {
 
       if (event.type === "analysis_complete") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        analysisJustCompletedRef.current = true;
         setIsComplete(true);
         setTimeoutWarning(false);
         if (event.confidence_distribution) {
@@ -155,6 +162,43 @@ export default function AnalysisPage() {
     };
   }, [router]);
 
+  // Translate displayed results when the user switches language after analysis is complete
+  useEffect(() => {
+    if (!isComplete) return;
+
+    // Skip the first time isComplete becomes true (results are already in the right language)
+    if (analysisJustCompletedRef.current) {
+      analysisJustCompletedRef.current = false;
+      return;
+    }
+
+    const translate = async () => {
+      setIsTranslating(true);
+      try {
+        const res = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ language: lang }),
+        });
+        if (!res.ok) return;
+        const data: { agents: AgentState[] } = await res.json();
+        setAgents((prev) =>
+          prev.map((a) => {
+            const translated = data.agents.find((ta) => ta.agent_id === a.agent_id);
+            if (!translated) return a;
+            return { ...a, findings: translated.findings, summary: translated.summary };
+          })
+        );
+        setAllFindings(data.agents.flatMap((a) => a.findings));
+        setSelectedFinding(null);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    void translate();
+  }, [lang, isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const completedCount = agents.filter((a) => a.status === "completed").length;
   const progress = Math.round((completedCount / agents.length) * 100);
 
@@ -165,15 +209,15 @@ export default function AnalysisPage() {
     const score = globalScore != null ? `${Math.round(globalScore * 100)}%` : "—";
 
     const lines = [
-      "# Confidence Map — Resumen Ejecutivo",
+      "# Confidence Map — Executive Summary",
       "",
-      `Confianza global: ${score}`,
-      `Total: ${allFindings.length} findings (${reds.length} críticos · ${yellows.length} inferidos · ${greens.length} confirmados)`,
+      `Global confidence: ${score}`,
+      `Total: ${allFindings.length} findings (${reds.length} critical · ${yellows.length} inferred · ${greens.length} confirmed)`,
       "",
     ];
 
     if (reds.length > 0) {
-      lines.push(`## Críticos — Alta incertidumbre (${reds.length})`);
+      lines.push(`## Critical — High uncertainty (${reds.length})`);
       reds.forEach((f) => {
         lines.push(`- **${f.title}** [${f.agent_name}]`);
         if (f.recommended_action) lines.push(`  → ${f.recommended_action}`);
@@ -181,7 +225,7 @@ export default function AnalysisPage() {
       lines.push("");
     }
     if (yellows.length > 0) {
-      lines.push(`## Inferidos — Razonablemente asumidos (${yellows.length})`);
+      lines.push(`## Inferred — Reasonably assumed (${yellows.length})`);
       yellows.forEach((f) => {
         lines.push(`- **${f.title}** [${f.agent_name}]`);
         if (f.recommended_action) lines.push(`  → ${f.recommended_action}`);
@@ -189,7 +233,7 @@ export default function AnalysisPage() {
       lines.push("");
     }
     if (greens.length > 0) {
-      lines.push(`## Confirmados — Explícitamente definidos (${greens.length})`);
+      lines.push(`## Confirmed — Explicitly defined (${greens.length})`);
       greens.forEach((f) => lines.push(`- ${f.title} [${f.agent_name}]`));
     }
 
@@ -219,7 +263,7 @@ export default function AnalysisPage() {
             className="text-slate-500 hover:text-slate-200 text-sm transition-colors flex items-center gap-1"
             aria-label="Back to home"
           >
-            ← Back
+            ← {t("nav.back")}
           </button>
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-accent flex items-center justify-center" aria-hidden="true">
@@ -247,10 +291,10 @@ export default function AnalysisPage() {
             </div>
           )}
           {isComplete ? (
-            <span className="text-xs text-confidence-green font-mono">Analysis complete</span>
+            <span className="text-xs text-confidence-green font-mono">{t("analysis.complete")}</span>
           ) : (
             <span className="text-xs text-slate-500 font-mono">
-              {completedCount}/{agents.length} agents
+              {t("analysis.progress", { completed: completedCount, total: agents.length })}
             </span>
           )}
         </div>
@@ -263,7 +307,11 @@ export default function AnalysisPage() {
             aria-label="View mode (Alt+1 Map, Alt+2 Table, Alt+3 Text)"
           >
             {(["map", "table", "text"] as const).map((view, i) => {
-              const labels = { map: "Map", table: "Table", text: "Text" };
+              const labels = {
+                map: t("analysis.view_map"),
+                table: t("analysis.view_table"),
+                text: t("analysis.view_text"),
+              };
               const active = activeView === view;
               return (
                 <button
@@ -284,6 +332,8 @@ export default function AnalysisPage() {
           </div>
         )}
 
+        <LanguageSwitcher />
+
         {/* Global confidence score + distribution */}
         {isComplete && (
           <div className="flex items-center gap-4">
@@ -291,9 +341,9 @@ export default function AnalysisPage() {
             {globalScore != null && (
               <div
                 className="flex items-center gap-2"
-                aria-label={`Nivel de confianza global: ${Math.round(globalScore * 100)}%`}
+                aria-label={`${t("summary.global_confidence")}: ${Math.round(globalScore * 100)}%`}
               >
-                <span className="text-xs text-slate-500 font-mono">Confianza global</span>
+                <span className="text-xs text-slate-500 font-mono">{t("summary.global_confidence")}</span>
                 <span
                   className={`text-lg font-bold font-mono tabular-nums ${
                     globalScore >= 0.7
@@ -314,7 +364,7 @@ export default function AnalysisPage() {
             {/* Distribución */}
             <div
               className="flex gap-3 text-xs font-mono"
-              aria-label={`Distribución: ${confidenceDist.green} confirmados, ${confidenceDist.yellow} inferidos, ${confidenceDist.red} inciertos`}
+              aria-label={`${t("summary.confirmed")}: ${confidenceDist.green}, ${t("summary.inferred")}: ${confidenceDist.yellow}, ${t("summary.critical")}: ${confidenceDist.red}`}
             >
               {(["green", "yellow", "red"] as const).map((level) => (
                 <span key={level} className={`flex items-center gap-1 text-confidence-${level}`}>
@@ -330,10 +380,24 @@ export default function AnalysisPage() {
       {/* Main content */}
       <main
         id="main-content"
-        className="flex flex-1 overflow-hidden"
+        className="relative flex flex-1 overflow-hidden"
         aria-label="Confidence map analysis"
       >
-        {/* Left sidebar — agent status */}
+        {/* Translation overlay */}
+      {isTranslating && (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center bg-surface/80 backdrop-blur-sm"
+          aria-live="polite"
+          aria-label="Translating results..."
+        >
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-surface-card border border-surface-border shadow-lg">
+            <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            <span className="text-sm text-slate-300 font-mono">{t("analysis.translating")}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Left sidebar — agent status */}
         <aside
           className="w-64 flex-shrink-0 border-r border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Agent status panel"
@@ -344,7 +408,7 @@ export default function AnalysisPage() {
           {agents.some((a) => a.summary) && (
             <div className="mt-6">
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-                Summaries
+                {t("analysis.summaries")}
               </h2>
               <div className="space-y-3">
                 {agents
@@ -367,14 +431,14 @@ export default function AnalysisPage() {
           <div
             className="flex-1 overflow-y-auto px-8 py-6 animate-fade-in"
             role="document"
-            aria-label="Vista de texto — todos los hallazgos"
+            aria-label="Text view — all findings"
           >
             <div className="max-w-3xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h1 className="text-lg font-bold text-slate-200">Confidence Map — Vista de texto</h1>
+                  <h1 className="text-lg font-bold text-slate-200">{t("text_view.title")}</h1>
                   <p className="text-xs text-slate-500 font-mono mt-1">
-                    Alt+1 Mapa · Alt+2 Tabla · Alt+3 Texto
+                    {t("text_view.shortcuts")}
                   </p>
                 </div>
                 {isComplete && (
@@ -383,7 +447,7 @@ export default function AnalysisPage() {
                     className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all font-mono"
                     aria-label="Copy executive summary to clipboard"
                   >
-                    {copied ? "Copiado ✓" : "Copiar resumen"}
+                    {copied ? t("text_view.copied") : t("text_view.copy_summary")}
                   </button>
                 )}
               </div>
@@ -392,7 +456,7 @@ export default function AnalysisPage() {
                 <section
                   key={agent.agent_id}
                   className="mb-10 pb-8 border-b border-surface-border last:border-0"
-                  aria-label={`Agente: ${agent.agent_name}`}
+                  aria-label={`Agent: ${agent.agent_name}`}
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <h2 className="text-sm font-bold text-slate-200">{agent.agent_name}</h2>
@@ -418,7 +482,7 @@ export default function AnalysisPage() {
                   )}
 
                   {agent.findings.length > 0 ? (
-                    <ul className="space-y-4" aria-label={`${agent.findings.length} hallazgos`}>
+                    <ul className="space-y-4" aria-label={`${agent.findings.length} findings`}>
                       {agent.findings.map((f) => (
                         <li
                           key={f.id}
@@ -469,14 +533,14 @@ export default function AnalysisPage() {
                             className="ml-4 mt-2 text-[10px] text-accent hover:underline font-mono"
                             aria-label={`Ver detalle completo de: ${f.title}`}
                           >
-                            Ver detalle →
+                            {t("text_view.view_detail")}
                           </button>
                         </li>
                       ))}
                     </ul>
                   ) : (
                     agent.status === "pending" && (
-                      <p className="text-xs text-slate-600 italic pl-3">Esperando...</p>
+                      <p className="text-xs text-slate-600 italic pl-3">{t("text_view.waiting")}</p>
                     )
                   )}
                 </section>
@@ -516,7 +580,7 @@ export default function AnalysisPage() {
                   aria-live="polite"
                 >
                   <span aria-hidden="true">⏳</span>
-                  Analysis is taking longer than expected — still running, please wait
+                  {t("analysis.timeout")}
                 </div>
               )}
               <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} />
@@ -539,7 +603,7 @@ export default function AnalysisPage() {
             <section aria-label="Executive summary" className="animate-fade-in">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                  Resumen ejecutivo
+                  {t("summary.title")}
                 </h2>
                 <button
                   onClick={copyExecutiveSummary}
@@ -547,9 +611,9 @@ export default function AnalysisPage() {
                   aria-label="Copy executive summary to clipboard"
                 >
                   {copied ? (
-                    <span className="text-confidence-green text-[10px] font-mono">Copiado ✓</span>
+                    <span className="text-confidence-green text-[10px] font-mono">{t("summary.copied")}</span>
                   ) : (
-                    <span className="text-[10px] font-mono">Copiar</span>
+                    <span className="text-[10px] font-mono">{t("summary.copy")}</span>
                   )}
                 </button>
               </div>
@@ -558,7 +622,7 @@ export default function AnalysisPage() {
               {globalScore != null && (
                 <div className="bg-surface border border-surface-border rounded-xl p-4 mb-4">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-slate-500">Confianza global</span>
+                    <span className="text-xs text-slate-500">{t("summary.global_confidence")}</span>
                     <span
                       className={`text-2xl font-bold font-mono tabular-nums ${
                         globalScore >= 0.7
@@ -574,7 +638,11 @@ export default function AnalysisPage() {
                   <div className="flex gap-2 text-xs font-mono">
                     {(["red", "yellow", "green"] as const).map((level) => {
                       const count = allFindings.filter((f) => f.confidence === level).length;
-                      const labels = { red: "Críticos", yellow: "Inferidos", green: "Confirmados" };
+                      const labels = {
+                        red: t("summary.critical"),
+                        yellow: t("summary.inferred"),
+                        green: t("summary.confirmed"),
+                      };
                       if (count === 0) return null;
                       return (
                         <div key={level} className={`flex-1 rounded-lg px-2 py-1.5 text-center bg-confidence-${level}-dim text-confidence-${level}`}>
@@ -591,7 +659,7 @@ export default function AnalysisPage() {
               {allFindings.filter((f) => f.confidence === "red").length > 0 && (
                 <div>
                   <h3 className="text-[10px] font-semibold text-confidence-red uppercase tracking-widest mb-2">
-                    Hallazgos críticos
+                    {t("summary.critical_findings")}
                   </h3>
                   <ul className="space-y-2">
                     {allFindings
@@ -618,7 +686,7 @@ export default function AnalysisPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-slate-600">
               <div className="text-4xl" aria-hidden="true">◎</div>
-              <p className="text-sm">Click any finding node on the map to see details</p>
+              <p className="text-sm">{t("analysis.no_finding")}</p>
             </div>
           )}
 
@@ -626,7 +694,7 @@ export default function AnalysisPage() {
           {allFindings.length > 0 && (
             <div className="mt-6">
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-                All findings ({allFindings.length})
+                {t("analysis.all_findings", { count: allFindings.length })}
               </h2>
               <ul
                 className="space-y-2"

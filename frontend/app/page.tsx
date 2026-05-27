@@ -3,25 +3,28 @@
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DEMO_SPEC, DEMO_ARCHITECTURE, DEMO_SPEC_AUTH, DEMO_ARCH_AUTH } from "@/lib/demo-spec";
+import { useI18n } from "@/lib/i18n";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, lang } = useI18n();
   const [spec, setSpec] = useState("");
   const [architecture, setArchitecture] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const specRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-load preset from URL on mount: ?spec=pagos | ?spec=auth
+  // Auto-load preset from URL on mount: ?spec=payments | ?spec=auth
   useEffect(() => {
     const preset = searchParams.get("spec");
-    if (preset === "pagos") { setSpec(DEMO_SPEC); setArchitecture(DEMO_ARCHITECTURE); }
+    if (preset === "payments") { setSpec(DEMO_SPEC); setArchitecture(DEMO_ARCHITECTURE); }
     else if (preset === "auth") { setSpec(DEMO_SPEC_AUTH); setArchitecture(DEMO_ARCH_AUTH); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadPreset = (preset: "pagos" | "auth") => {
-    if (preset === "pagos") {
+  const loadPreset = (preset: "payments" | "auth") => {
+    if (preset === "payments") {
       setSpec(DEMO_SPEC);
       setArchitecture(DEMO_ARCHITECTURE);
     } else {
@@ -35,7 +38,7 @@ function HomePageContent() {
 
   const handleAnalyze = async () => {
     if (!spec.trim()) {
-      setError("Please enter a specification to analyze.");
+      setError(t("home.error_empty"));
       specRef.current?.focus();
       return;
     }
@@ -46,7 +49,7 @@ function HomePageContent() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec, architecture }),
+        body: JSON.stringify({ spec, architecture, language: lang }),
       });
 
       if (!res.ok) throw new Error("Failed to start analysis");
@@ -56,7 +59,7 @@ function HomePageContent() {
       sessionStorage.setItem("analysis_spec", spec);
       router.push("/analysis");
     } catch (e) {
-      setError("Could not connect to the analysis service. Is the backend running?");
+      setError(t("home.error_connect"));
       setIsLoading(false);
     }
   };
@@ -68,6 +71,9 @@ function HomePageContent() {
     >
       {/* Header */}
       <header className="text-center mb-12 animate-fade-in">
+        <div className="flex items-center justify-end mb-2 w-full max-w-3xl mx-auto">
+          <LanguageSwitcher />
+        </div>
         <div className="flex items-center justify-center gap-2 mb-4">
           <div
             className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center"
@@ -85,12 +91,10 @@ function HomePageContent() {
         </div>
 
         <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
-          AI Architecture &amp;{" "}
-          <span className="text-accent">Delivery Intelligence</span>
+          {t("home.title")}
         </h1>
         <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-          Paste your PRD or specification. Six specialized agents will analyze it
-          simultaneously — surfacing ambiguity, risks, and blind spots with explicit confidence levels.
+          {t("home.subtitle")}
         </p>
       </header>
 
@@ -105,17 +109,17 @@ function HomePageContent() {
           role="note"
           aria-label="Confidence level legend"
         >
-          {[
-            { level: "green", label: "Explicitly defined" },
-            { level: "yellow", label: "Reasonably inferred" },
-            { level: "red", label: "High uncertainty" },
-          ].map(({ level, label }) => (
+          {([
+            { level: "green", key: "legend.green" },
+            { level: "yellow", key: "legend.yellow" },
+            { level: "red", key: "legend.red" },
+          ] as const).map(({ level, key }) => (
             <div key={level} className="flex items-center gap-1.5">
               <span
                 className={`w-2.5 h-2.5 rounded-full bg-confidence-${level}`}
                 aria-hidden="true"
               />
-              <span className="text-slate-400">{label}</span>
+              <span className="text-slate-400">{t(key)}</span>
             </div>
           ))}
         </div>
@@ -126,7 +130,7 @@ function HomePageContent() {
             htmlFor="spec-input"
             className="block text-sm font-medium text-slate-300 mb-2"
           >
-            Specification / PRD / User Stories{" "}
+            {t("home.spec_label")}{" "}
             <span className="text-confidence-red" aria-label="required">*</span>
           </label>
           <textarea
@@ -135,7 +139,7 @@ function HomePageContent() {
             value={spec}
             onChange={(e) => setSpec(e.target.value)}
             rows={14}
-            placeholder="Paste your PRD, user stories, BRD, or any engineering specification here..."
+            placeholder={t("home.spec_placeholder")}
             className="w-full bg-surface border border-surface-border rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 font-mono text-sm resize-none focus:border-accent focus:outline-none transition-colors"
             aria-required="true"
             aria-describedby={error ? "spec-error" : undefined}
@@ -148,15 +152,15 @@ function HomePageContent() {
             htmlFor="arch-input"
             className="block text-sm font-medium text-slate-300 mb-2"
           >
-            Architecture / ADR{" "}
-            <span className="text-slate-500 font-normal">(optional)</span>
+            {t("home.arch_label")}{" "}
+            <span className="text-slate-500 font-normal">{t("home.arch_optional")}</span>
           </label>
           <textarea
             id="arch-input"
             value={architecture}
             onChange={(e) => setArchitecture(e.target.value)}
             rows={5}
-            placeholder="Paste architecture description, diagrams as text, or ADRs..."
+            placeholder={t("home.arch_placeholder")}
             className="w-full bg-surface border border-surface-border rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 font-mono text-sm resize-none focus:border-accent focus:outline-none transition-colors"
           />
         </div>
@@ -186,27 +190,27 @@ function HomePageContent() {
                   className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
                   aria-hidden="true"
                 />
-                Starting analysis...
+                {t("home.running")}
               </>
             ) : (
               <>
                 <span aria-hidden="true">&#9654;</span>
-                Run Analysis
+                {t("home.run")}
               </>
             )}
           </button>
 
           {/* Preset selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 flex-shrink-0">Try a preset:</span>
+            <span className="text-xs text-slate-500 flex-shrink-0">{t("home.preset_label")}</span>
             <div className="flex gap-2 flex-1">
               <button
-                onClick={() => loadPreset("pagos")}
+                onClick={() => loadPreset("payments")}
                 className="flex-1 py-2 px-3 text-xs text-slate-400 hover:text-slate-200 border border-surface-border hover:border-accent/50 rounded-lg transition-colors text-left group"
                 aria-label="Load NovaBank international payments demo specification"
               >
                 <span className="text-accent font-mono mr-1.5 group-hover:text-accent">▸</span>
-                NovaBank · Pagos
+                {t("home.preset_payments")}
                 <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-confidence-green-dim text-confidence-green font-mono uppercase">demo</span>
               </button>
               <button
@@ -215,7 +219,7 @@ function HomePageContent() {
                 aria-label="Load NovaBank MFA authentication demo specification"
               >
                 <span className="text-accent font-mono mr-1.5 group-hover:text-accent">▸</span>
-                NovaBank · Auth MFA
+                {t("home.preset_auth")}
               </button>
             </div>
           </div>
@@ -228,27 +232,27 @@ function HomePageContent() {
         aria-label="Available analysis agents"
       >
         <p className="text-center text-slate-500 text-sm mb-4">
-          Six specialized agents analyze your spec simultaneously
+          {t("home.agents_subtitle")}
         </p>
         <ul
           className="grid grid-cols-2 md:grid-cols-3 gap-3"
           role="list"
           aria-label="Analysis agents"
         >
-          {[
-            { name: "Spec Analyst", desc: "Ambiguity & gaps", color: "indigo" },
-            { name: "Architecture Validator", desc: "Drift & coupling", color: "violet" },
-            { name: "Risk Intelligence", desc: "Security & delivery", color: "rose" },
-            { name: "Business Impact", desc: "Cost & velocity", color: "amber" },
-            { name: "Accessibility Advocate", desc: "WCAG & inclusion", color: "emerald" },
-            { name: "Delivery Historian", desc: "Patterns & pitfalls", color: "sky" },
-          ].map((agent) => (
+          {([
+            { name: "Spec Analyst", descKey: "agent.spec_analyst_desc" },
+            { name: "Architecture Validator", descKey: "agent.arch_validator_desc" },
+            { name: "Risk Intelligence", descKey: "agent.risk_intel_desc" },
+            { name: "Business Impact", descKey: "agent.biz_impact_desc" },
+            { name: "Accessibility Advocate", descKey: "agent.access_advocate_desc" },
+            { name: "Delivery Historian", descKey: "agent.delivery_hist_desc" },
+          ] as const).map((agent) => (
             <li
               key={agent.name}
               className="bg-surface-card border border-surface-border rounded-xl p-4"
             >
               <div className="font-medium text-sm text-slate-200">{agent.name}</div>
-              <div className="text-xs text-slate-500 mt-0.5">{agent.desc}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{t(agent.descKey)}</div>
             </li>
           ))}
         </ul>

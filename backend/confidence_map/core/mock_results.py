@@ -6,6 +6,8 @@ Findings are based on the NovaBank international payments spec.
 
 from __future__ import annotations
 
+from typing import Any
+
 from confidence_map.models.findings import AgentResult, AgentStatus, ConfidenceLevel, Finding
 
 # Simulated agent completion times (seconds) — realistic but fast for demo
@@ -19,9 +21,9 @@ AGENT_DELAYS: dict[str, float] = {
 }
 
 
-def get_mock_results() -> dict[str, AgentResult]:
+def get_mock_results(language: str = "en") -> dict[str, AgentResult]:
     """Return pre-generated AgentResult for each agent keyed by agent_id."""
-    return {
+    results = {
         "spec_analyst": _spec_analyst(),
         "arch_validator": _arch_validator(),
         "risk_intelligence": _risk_intelligence(),
@@ -29,6 +31,26 @@ def get_mock_results() -> dict[str, AgentResult]:
         "accessibility_advocate": _accessibility_advocate(),
         "delivery_historian": _delivery_historian(),
     }
+    if language != "en":
+        _apply_translations(results, language)
+    return results
+
+
+def _apply_translations(results: dict[str, AgentResult], language: str) -> None:
+    """Patch summaries and finding titles with translated versions for DEMO_MODE."""
+    if language not in _TRANSLATIONS:
+        return
+    lang_data = _TRANSLATIONS[language]
+    for agent_id, result in results.items():
+        if agent_id not in lang_data:
+            continue
+        agent_data = lang_data[agent_id]
+        if "summary" in agent_data:
+            result.summary = agent_data["summary"]
+        title_map: dict[str, str] = agent_data.get("titles", {})
+        for finding in result.findings:
+            if finding.title in title_map:
+                finding.title = title_map[finding.title]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -81,124 +103,124 @@ def _spec_analyst() -> AgentResult:
     aid, aname = "spec_analyst", "Spec Analyst"
     findings = [
         _f(
-            title="Comportamiento ante timeout del CoreBanking no definido",
+            title="CoreBanking timeout behavior not defined",
             description=(
-                "El spec no define qué ocurre cuando el gateway CoreBanking tarda más de 10 segundos. "
-                "Sin este comportamiento definido, un retry automático generaría pagos duplicados — "
-                "el riesgo más crítico en un sistema de pagos."
+                "The spec does not define what happens when the CoreBanking gateway takes more than 10 seconds. "
+                "Without this behavior defined, an automatic retry would generate duplicate payments — "
+                "the most critical risk in a payment system."
             ),
             confidence="red",
             score=0.08,
-            evidence="'El pago debe completarse dentro del SLA regulatorio' — no se define qué pasa si no lo hace.",
+            evidence="'The payment must complete within the regulatory SLA' — no definition of what happens if it does not.",
             assumptions=[],
             needs_validation=[
-                "¿Cuál es el comportamiento cuando CoreBanking supera el SLA?",
-                "¿El sistema reintenta o cancela la transacción?",
-                "¿Cómo se informa al usuario de una transacción en estado indefinido?",
+                "What is the behavior when CoreBanking exceeds the SLA?",
+                "Does the system retry or cancel the transaction?",
+                "How is the user notified of a transaction in an undefined state?",
             ],
             recommended_action=(
-                "Organizar una sesión de refinamiento con Sofia y Daniel para definir "
-                "el comportamiento de timeout: ¿cancelar, reintentar con idempotencia, "
-                "o marcar como 'pending' para reconciliación manual?"
+                "Schedule a refinement session with Sofia and Daniel to define "
+                "timeout behavior: cancel, retry with idempotency, "
+                "or mark as 'pending' for manual reconciliation?"
             ),
             category="ambiguity",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="US-003: 'Qué hacer a continuación' no especificado",
+            title="US-003: 'What to do next' on failure not specified",
             description=(
-                "La historia de fallo dice 'el sistema debe indicar qué hacer a continuación' "
-                "pero no define cuáles son esas acciones. ¿Reintentar? ¿Contactar soporte? "
-                "¿El reintento es automático o manual? Sin esto, el equipo implementará "
-                "comportamientos inconsistentes."
+                "The failure story says 'the system must indicate what to do next' "
+                "but does not define what those actions are. Retry? Contact support? "
+                "Is the retry automatic or manual? Without this, the team will implement "
+                "inconsistent behaviors across failure scenarios."
             ),
             confidence="red",
             score=0.15,
-            evidence="'En caso de fallo, el sistema debe indicar qué hacer a continuación.'",
-            assumptions=["'Fallo' incluye rechazo por antifraude y timeout de CoreBanking."],
+            evidence="'In case of failure, the system must indicate what to do next.'",
+            assumptions=["'Failure' includes anti-fraud rejection and CoreBanking timeout."],
             needs_validation=[
-                "¿Cuáles son las acciones disponibles tras un fallo?",
-                "¿El usuario puede reintentar inmediatamente o hay un período de espera?",
+                "What actions are available after a failure?",
+                "Can the user retry immediately or is there a waiting period?",
             ],
             recommended_action=(
-                "Sofia debe redactar los criterios de aceptación de error específicos para US-003: "
-                "listado de acciones disponibles (reintentar, contactar soporte, ver estado) "
-                "con UX copy definido para cada caso."
+                "Sofia should draft specific acceptance criteria for US-003 error states: "
+                "list of available actions (retry, contact support, view status) "
+                "with UX copy defined for each case."
             ),
             category="gap",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="SLA regulatorio de 10 segundos ausente en criterios de aceptación",
+            title="10-second regulatory SLA absent from acceptance criteria",
             description=(
-                "El valor de 10 segundos está mencionado en el contexto de negocio pero ninguna "
-                "historia de usuario lo referencia explícitamente como criterio verificable. "
-                "Sin este dato en los AC, QA no puede construir un test de aceptación para el SLA."
+                "The 10-second value is mentioned in the business context but no "
+                "user story references it explicitly as a verifiable criterion. "
+                "Without this in the ACs, QA cannot build an acceptance test for the SLA."
             ),
             confidence="yellow",
             score=0.42,
             evidence=(
-                "'La regulación local exige confirmación de transacción en menos de 10 segundos.' "
-                "— aparece en contexto, no en AC."
+                "'Local regulation requires transaction confirmation in under 10 seconds.' "
+                "— appears in context, not in ACs."
             ),
-            assumptions=["El SLA aplica a todo el flujo de US-001, no solo a la respuesta de pantalla."],
-            needs_validation=["¿El SLA de 10s aplica al tiempo total o al tiempo de respuesta del API?"],
+            assumptions=["The SLA applies to the full US-001 flow, not just the screen response."],
+            needs_validation=["Does the 10s SLA apply to total time or to API response time?"],
             recommended_action=(
-                "Agregar como criterio de aceptación explícito en US-001: "
-                "'El sistema retorna confirmación o error al usuario en menos de 10 segundos desde el envío.' "
-                "Esto convierte el SLA en un test automatizable por QA."
+                "Add as an explicit acceptance criterion in US-001: "
+                "'The system returns confirmation or error to the user in under 10 seconds from submission.' "
+                "This turns the SLA into a QA-automatable test."
             ),
             category="gap",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="US-002: Mecanismo de actualización automática contradice notas técnicas",
+            title="US-002: Auto-update mechanism contradicts technical notes",
             description=(
-                "Los criterios de US-002 dicen 'el estado se actualiza automáticamente sin refrescar la página', "
-                "pero las notas técnicas especifican 'polling cada 3 segundos'. "
-                "Polling no es actualización automática; es una simulación con latencia de hasta 3s. "
-                "El criterio y la implementación propuesta son inconsistentes."
+                "US-002 acceptance criteria say 'status updates automatically without refreshing the page', "
+                "but technical notes specify 'polling every 3 seconds'. "
+                "Polling is not automatic update; it is a simulation with up to 3s latency. "
+                "The criterion and the proposed implementation are inconsistent."
             ),
             confidence="yellow",
             score=0.38,
             evidence=(
-                "AC: 'El estado se actualiza automáticamente sin refrescar la página.' "
-                "Notas técnicas: 'React SPA con polling cada 3 segundos'."
+                "AC: 'Status updates automatically without refreshing the page.' "
+                "Technical notes: 'React SPA with polling every 3 seconds'."
             ),
             assumptions=[],
-            needs_validation=["¿3 segundos de latencia máxima es aceptable para el usuario?"],
+            needs_validation=["Is 3-second maximum latency acceptable to the user?"],
             recommended_action=(
-                "Alinear con producto si el polling de 3s es aceptable para US-002. "
-                "Si no lo es, habilitar WebSockets o SSE antes del inicio del sprint — "
-                "retroalimentar el frontend después es 5x más costoso."
+                "Align with product on whether 3s polling is acceptable for US-002. "
+                "If not, enable WebSockets or SSE before the sprint starts — "
+                "retrofitting the frontend afterwards is 5x more costly."
             ),
             category="contradiction",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Historial de transacciones: criterios de exportación incompletos",
+            title="Transaction history: export criteria incomplete",
             description=(
-                "US-004 especifica exportación a CSV pero no define: qué campos se incluyen, "
-                "si los datos sensibles (IBAN completo) se exportan o se enmascaran, "
-                "y si hay límite de registros. En un contexto PCI-DSS, exportar datos de cuenta "
-                "sin restricciones es un riesgo de compliance."
+                "US-004 specifies CSV export but does not define: which fields are included, "
+                "whether sensitive data (full IBAN) is exported or masked, "
+                "or if there is a record limit. In a PCI-DSS context, exporting account data "
+                "without restrictions is a compliance risk."
             ),
             confidence="yellow",
             score=0.35,
-            evidence="'Exportación a CSV' — sin especificación de campos ni restricciones de seguridad.",
-            assumptions=["El CSV es para uso interno de tesorería del cliente corporativo."],
+            evidence="'CSV export' — no field specification or security restrictions.",
+            assumptions=["The CSV is for internal use by the corporate client's treasury team."],
             needs_validation=[
-                "¿Se exportan datos sensibles (IBAN, SWIFT) completos o enmascarados?",
-                "¿Existe un límite de registros por exportación?",
+                "Are sensitive fields (IBAN, SWIFT) exported in full or masked?",
+                "Is there a record limit per export?",
             ],
             recommended_action=(
-                "Definir en US-004: exportar últimos 4 dígitos de IBAN/SWIFT enmascarados, "
-                "límite de 10.000 registros por exportación, y revisar con Legal "
-                "si el CSV requiere controles adicionales bajo PCI-DSS."
+                "Define in US-004: export last 4 digits of IBAN/SWIFT masked, "
+                "10,000-record limit per export, and review with Legal "
+                "whether the CSV requires additional controls under PCI-DSS."
             ),
             category="gap",
             agent_id=aid,
@@ -207,12 +229,12 @@ def _spec_analyst() -> AgentResult:
     ]
     return _result(
         aid, aname, "FileSearch", findings,
-        "El análisis del spec de NovaBank revela cinco problemas críticos. El más urgente: "
-        "el comportamiento ante timeout del CoreBanking no está definido, creando riesgo directo de pagos duplicados. "
-        "Adicionalmente, el SLA regulatorio de 10 segundos no aparece en los criterios de aceptación, "
-        "la historia de fallo de pago es demasiado vaga para ser implementable, y existe una contradicción "
-        "entre el criterio de 'actualización automática' y el polling propuesto. "
-        "Se recomienda una sesión de refinamiento con Sofia y Daniel antes de comenzar el desarrollo.",
+        "The NovaBank spec analysis reveals five critical issues. The most urgent: "
+        "the CoreBanking timeout behavior is undefined, creating direct risk of duplicate payments. "
+        "Additionally, the 10-second regulatory SLA does not appear in the acceptance criteria, "
+        "the payment failure story is too vague to implement, and there is a contradiction "
+        "between the 'automatic update' criterion and the proposed polling. "
+        "A refinement session with Sofia and Daniel is recommended before development begins.",
     )
 
 
@@ -223,114 +245,114 @@ def _arch_validator() -> AgentResult:
     aid, aname = "arch_validator", "Architecture Validator"
     findings = [
         _f(
-            title="CoreBanking síncrono (2-15s) hace el SLA de 10s matemáticamente imposible",
+            title="Synchronous CoreBanking (2-15s) makes 10s SLA mathematically impossible",
             description=(
-                "Con latencia del CoreBanking de 2-15s y antifraude de 3s adicionales, "
-                "el tiempo total en P95 supera los 18 segundos. "
-                "La arquitectura propuesta no puede cumplir el SLA regulatorio de 10s "
-                "bajo carga normal, garantizando incumplimiento regulatorio desde el día 1."
+                "With CoreBanking latency of 2-15s and an additional 3s for anti-fraud, "
+                "total time at P95 exceeds 18 seconds. "
+                "The proposed architecture cannot meet the 10s regulatory SLA "
+                "under normal load, guaranteeing regulatory non-compliance from day one."
             ),
             confidence="red",
             score=0.05,
             evidence=(
-                "'El gateway SWIFT CoreBanking v2.1 es un sistema síncrono que puede tener latencias de 2-15 segundos.' "
-                "'El sistema antifraude externo (FraudShield) responde en promedio en 3 segundos.'"
+                "'The SWIFT CoreBanking v2.1 gateway is a synchronous system with latencies of 2-15 seconds.' "
+                "'The external anti-fraud system (FraudShield) responds on average in 3 seconds.'"
             ),
-            assumptions=["Las latencias son aditivas en el flujo síncrono actual."],
+            assumptions=["Latencies are additive in the current synchronous flow."],
             needs_validation=[
-                "¿Es posible precalificar la transacción con antifraude de forma asíncrona?",
-                "¿Tiene el CoreBanking un modo asíncrono no documentado?",
+                "Is it possible to pre-qualify the transaction with anti-fraud asynchronously?",
+                "Does CoreBanking have an undocumented async mode?",
             ],
             recommended_action=(
-                "Implementar patrón async: el endpoint retorna 202 Accepted con un ID de transacción; "
-                "el estado se consulta por polling o WebSocket. "
-                "Esto desacopla el SLA del usuario de la latencia del CoreBanking."
+                "Implement async pattern: the endpoint returns 202 Accepted with a transaction ID; "
+                "status is polled or pushed via WebSocket. "
+                "This decouples the user SLA from CoreBanking latency."
             ),
             category="contradiction",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="API Gateway instancia única: punto único de falla en sistema financiero",
+            title="Single-instance API Gateway: single point of failure in a financial system",
             description=(
-                "El API Gateway es una instancia única sin load balancer ni redundancia. "
-                "Cualquier restart, despliegue o fallo del nodo deja el sistema completamente inaccesible. "
-                "Esto contradice directamente el objetivo de 99.9% de disponibilidad."
+                "The API Gateway is a single instance with no load balancer or redundancy. "
+                "Any restart, deployment, or node failure leaves the system completely inaccessible. "
+                "This directly contradicts the 99.9% availability target."
             ),
             confidence="red",
             score=0.08,
-            evidence="'API Gateway: Node.js + Express, instancia única'",
+            evidence="'API Gateway: Node.js + Express, single instance'",
             assumptions=[],
-            needs_validation=["¿Existe un plan de redundancia para el API Gateway?"],
+            needs_validation=["Is there a redundancy plan for the API Gateway?"],
             recommended_action=(
-                "Agregar una segunda instancia del API Gateway detrás del balanceador de carga "
-                "existente antes del go-live. Costo mínimo de configuración; "
-                "impacto en disponibilidad máximo."
+                "Add a second API Gateway instance behind the existing load balancer "
+                "before go-live. Minimal configuration cost; "
+                "maximum impact on availability."
             ),
             category="risk",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Sin timeout en llamadas al CoreBanking: riesgo de thread starvation",
+            title="No timeout on CoreBanking calls: thread starvation risk",
             description=(
-                "El Payment Service llama al CoreBanking sin timeout configurado, "
-                "usando el default del cliente HTTP (típicamente infinito). "
-                "Si el CoreBanking se degrada, los threads del Payment Service quedan bloqueados "
-                "indefinidamente, saturando el pool de conexiones y derrumbando el servicio completo."
+                "The Payment Service calls CoreBanking with no timeout configured, "
+                "using the HTTP client default (typically infinite). "
+                "If CoreBanking degrades, Payment Service threads will block "
+                "indefinitely, exhausting the connection pool and bringing down the entire service."
             ),
             confidence="red",
             score=0.1,
-            evidence="'Sin timeout configurado para llamadas al CoreBanking (usa el default del cliente HTTP)'",
+            evidence="'No timeout configured for CoreBanking calls (uses HTTP client default)'",
             assumptions=[],
-            needs_validation=["¿Cuál es el timeout máximo aceptable para el CoreBanking?"],
+            needs_validation=["What is the maximum acceptable timeout for CoreBanking?"],
             recommended_action=(
-                "Configurar timeout explícito de 8 segundos en el cliente httpx para CoreBanking. "
-                "Devolver 503 al cliente si no responde. Es un cambio de 2 líneas de código "
-                "que debe hacerse en el primer sprint."
+                "Set an explicit 8-second timeout in the httpx client for CoreBanking. "
+                "Return 503 to the client if it does not respond. This is a 2-line code change "
+                "that must be made in the first sprint."
             ),
             category="risk",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Sin idempotencia: reintentos generarán pagos duplicados",
+            title="No idempotency: retries will generate duplicate payments",
             description=(
-                "No hay clave de idempotencia ni deduplicación de transacciones. "
-                "Si el cliente reintenta por timeout o el sistema hace retry automático, "
-                "el mismo pago se ejecutará múltiples veces en el CoreBanking. "
-                "En pagos internacionales, esto implica pérdidas financieras reales."
+                "There is no idempotency key or transaction deduplication. "
+                "If the client retries on timeout or the system auto-retries, "
+                "the same payment will execute multiple times in CoreBanking. "
+                "In international payments, this means real financial losses."
             ),
             confidence="red",
             score=0.12,
-            evidence="'Sin mecanismo de idempotencia implementado en las transacciones'",
-            assumptions=["El CoreBanking no tiene deduplicación propia."],
-            needs_validation=["¿Puede el CoreBanking detectar transacciones duplicadas por su cuenta?"],
+            evidence="'No idempotency mechanism implemented in transactions'",
+            assumptions=["CoreBanking does not have its own deduplication."],
+            needs_validation=["Can CoreBanking detect duplicate transactions on its own?"],
             recommended_action=(
-                "Implementar UUID de idempotencia: el cliente envía un header `X-Idempotency-Key`, "
-                "el Payment Service lo almacena en PostgreSQL con TTL de 24h "
-                "y rechaza duplicados con 409 Conflict. Estándar de la industria, implementable en un sprint."
+                "Implement idempotency UUID: the client sends an `X-Idempotency-Key` header, "
+                "Payment Service stores it in PostgreSQL with a 24h TTL "
+                "and rejects duplicates with 409 Conflict. Industry standard, implementable in one sprint."
             ),
             category="gap",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Notificaciones síncronas sin cola: pérdida silenciosa en fallo de SendGrid",
+            title="Synchronous notifications without queue: silent loss on SendGrid failure",
             description=(
-                "SendGrid se llama síncronamente al completar cada transacción, sin cola de mensajes ni retry. "
-                "Si SendGrid falla (downtime, rate limit, error de red), la transacción ya fue procesada "
-                "pero el cliente no recibe confirmación. El fallo es silencioso — no hay alerta ni reintento."
+                "SendGrid is called synchronously on each transaction completion, with no message queue or retry. "
+                "If SendGrid fails (downtime, rate limit, network error), the transaction was already processed "
+                "but the client receives no confirmation. The failure is silent — no alert, no retry."
             ),
             confidence="yellow",
             score=0.28,
-            evidence="'Llamada directa a SendGrid desde el Payment Service al completar cada transacción. Sin cola de mensajes. Sin retry en caso de fallo de SendGrid.'",
-            assumptions=["SendGrid tiene SLA del 99.9%, pero el 0.1% restante afecta transacciones reales."],
-            needs_validation=["¿Es aceptable que una transacción exitosa no genere email de confirmación?"],
+            evidence="'Direct call to SendGrid from Payment Service on each transaction. No message queue. No retry on SendGrid failure.'",
+            assumptions=["SendGrid has a 99.9% SLA, but the remaining 0.1% affects real transactions."],
+            needs_validation=["Is it acceptable for a successful transaction to generate no confirmation email?"],
             recommended_action=(
-                "Agregar tabla `pending_notifications` en PostgreSQL. "
-                "El Payment Service inserta el registro y un worker asíncrono envía el email "
-                "con retry exponencial. Desacopla el éxito del pago del éxito de la notificación."
+                "Add a `pending_notifications` table in PostgreSQL. "
+                "Payment Service inserts the record and an async worker sends the email "
+                "with exponential retry. Decouples payment success from notification success."
             ),
             category="risk",
             agent_id=aid,
@@ -339,12 +361,12 @@ def _arch_validator() -> AgentResult:
     ]
     return _result(
         aid, aname, "GitBranch", findings,
-        "La arquitectura propuesta tiene tres problemas bloqueantes para producción. "
-        "Primero, la combinación de latencias del CoreBanking (2-15s) y el antifraude (3s) hace matemáticamente "
-        "imposible cumplir el SLA regulatorio de 10 segundos. Segundo, la ausencia de timeout en las llamadas "
-        "al CoreBanking y la falta de circuit breaker crean riesgo de cascading failure total. "
-        "Tercero, sin idempotencia, los reintentos generarán pagos duplicados con certeza. "
-        "Se recomienda priorizar: desacoplamiento asíncrono del CoreBanking, timeout explícito y clave de idempotencia.",
+        "The proposed architecture has three production-blocking issues. "
+        "First, the combination of CoreBanking latencies (2-15s) and anti-fraud (3s) makes it mathematically "
+        "impossible to meet the 10-second regulatory SLA. Second, the absence of a timeout on CoreBanking calls "
+        "and the lack of a circuit breaker create a cascading failure risk. "
+        "Third, without idempotency, retries will certainly generate duplicate payments. "
+        "Priority recommendations: async CoreBanking decoupling, explicit timeout, and idempotency key.",
     )
 
 
@@ -355,123 +377,123 @@ def _risk_intelligence() -> AgentResult:
     aid, aname = "risk_intelligence", "Risk Intelligence"
     findings = [
         _f(
-            title="Sin circuit breaker al CoreBanking: fallo en cascada garantizado",
+            title="No circuit breaker to CoreBanking: guaranteed cascading failure",
             description=(
-                "No hay circuit breaker entre el Payment Service y el CoreBanking. "
-                "Si el CoreBanking se degrada o cae, todas las solicitudes de pago quedarán bloqueadas "
-                "esperando, agotando el pool de conexiones del Payment Service y derrumbando "
-                "la plataforma completa — no solo los pagos internacionales."
+                "There is no circuit breaker between the Payment Service and CoreBanking. "
+                "If CoreBanking degrades or goes down, all payment requests will block "
+                "waiting, exhausting the Payment Service connection pool and bringing down "
+                "the entire platform — not just international payments."
             ),
             confidence="red",
             score=0.07,
-            evidence="'Sin lógica de retry implementada' y 'sin timeout configurado' implican ausencia de circuit breaker.",
-            assumptions=["El CoreBanking tiene historial de degradaciones por ser sistema legacy."],
-            needs_validation=["¿Hay SLA interno del CoreBanking documentado?"],
+            evidence="'No retry logic implemented' and 'no timeout configured' imply the absence of a circuit breaker.",
+            assumptions=["CoreBanking has a history of degradations as a legacy system."],
+            needs_validation=["Is there a documented internal SLA for CoreBanking?"],
             recommended_action=(
-                "Implementar circuit breaker con Tenacity (Python): 5 fallos consecutivos abren el circuito "
-                "por 30 segundos y retornan 503 inmediato al cliente. "
-                "Implementable en un día; evita que un fallo del CoreBanking derrumbe toda la plataforma."
+                "Implement circuit breaker with Tenacity (Python): 5 consecutive failures open the circuit "
+                "for 30 seconds and return immediate 503 to the client. "
+                "Implementable in one day; prevents a CoreBanking failure from bringing down the entire platform."
             ),
             category="risk",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="PCI-DSS nivel 1 declarado pero cifrado de datos de cuenta no definido",
+            title="PCI-DSS Level 1 declared but account data encryption not defined",
             description=(
-                "El spec prohíbe almacenar IBAN/SWIFT en texto plano pero no define: "
-                "algoritmo de cifrado, gestión de claves, cifrado en tránsito entre servicios internos, "
-                "ni tokenización. Sin esta definición, el cumplimiento PCI-DSS no puede verificarse "
-                "y el sistema fallará una auditoría de seguridad."
+                "The spec prohibits storing IBAN/SWIFT in plaintext but does not define: "
+                "encryption algorithm, key management, encryption in transit between internal services, "
+                "or tokenization. Without this definition, PCI-DSS compliance cannot be verified "
+                "and the system will fail a security audit."
             ),
             confidence="red",
             score=0.1,
-            evidence="'Los datos de cuenta SWIFT/IBAN no pueden almacenarse en texto plano.' — sin especificación de cómo protegerlos.",
+            evidence="'SWIFT/IBAN account data cannot be stored in plaintext.' — no specification of how to protect it.",
             assumptions=[],
             needs_validation=[
-                "¿Se usa tokenización o cifrado simétrico para IBAN/SWIFT?",
-                "¿Quién gestiona las claves de cifrado?",
-                "¿Los datos viajan cifrados entre Payment Service y CoreBanking?",
+                "Is tokenization or symmetric encryption used for IBAN/SWIFT?",
+                "Who manages the encryption keys?",
+                "Is data encrypted in transit between Payment Service and CoreBanking?",
             ],
             recommended_action=(
-                "Reunión urgente con el equipo de seguridad esta semana. "
-                "Definir: AES-256-GCM para cifrado en reposo de IBAN/SWIFT, claves en HashiCorp Vault. "
-                "Bloquear el go-live hasta aprobación formal del equipo legal y de seguridad."
+                "Urgent meeting with the security team this week. "
+                "Define: AES-256-GCM for IBAN/SWIFT at-rest encryption, keys in HashiCorp Vault. "
+                "Block go-live until formal approval from the legal and security teams."
             ),
             category="risk",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Sin rate limiting en el API Gateway",
+            title="No rate limiting on the API Gateway",
             description=(
-                "El API Gateway no implementa rate limiting. Con picos proyectados de 500 TPS "
-                "y crecimiento del 300%, un actor malicioso o un error de cliente podría generar "
-                "carga arbitraria sobre el CoreBanking legacy, que no fue diseñado para absorber "
-                "tráfico no controlado."
+                "The API Gateway does not implement rate limiting. With projected peaks of 500 TPS "
+                "and 300% growth, a malicious actor or client error could generate "
+                "arbitrary load on the legacy CoreBanking, which was not designed to absorb "
+                "uncontrolled traffic."
             ),
             confidence="yellow",
             score=0.32,
-            evidence="'Sin rate limiting implementado aún'",
-            assumptions=["El CoreBanking no tiene rate limiting propio."],
-            needs_validation=["¿Cuál es el límite de TPS que el CoreBanking puede absorber?"],
+            evidence="'Rate limiting not yet implemented'",
+            assumptions=["CoreBanking does not have its own rate limiting."],
+            needs_validation=["What is the maximum TPS that CoreBanking can absorb?"],
             recommended_action=(
-                "Agregar rate limiting en Express con `express-rate-limit`: "
-                "100 req/min por JWT token. Implementable en 4 horas. "
-                "Protege el CoreBanking de ráfagas accidentales o maliciosas."
+                "Add rate limiting in Express with `express-rate-limit`: "
+                "100 req/min per JWT token. Implementable in 4 hours. "
+                "Protects CoreBanking from accidental or malicious bursts."
             ),
             category="risk",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Sin estrategia de rollback transaccional",
+            title="No transactional rollback strategy",
             description=(
-                "Si el pago se ejecuta exitosamente en el CoreBanking pero falla la escritura "
-                "en la base de datos local de NovaBank (o la notificación), el sistema queda "
-                "en estado inconsistente: el dinero salió pero el sistema no lo registró. "
-                "No hay mecanismo de compensación ni reconciliación automática definido."
+                "If the payment executes successfully in CoreBanking but the write "
+                "to the local NovaBank database fails (or the notification fails), the system enters "
+                "an inconsistent state: the money left but the system did not record it. "
+                "There is no compensation mechanism or automatic reconciliation defined."
             ),
             confidence="red",
             score=0.14,
-            evidence="Ausencia de mención de transacciones distribuidas, sagas o mecanismos de compensación en toda la arquitectura.",
+            evidence="No mention of distributed transactions, sagas, or compensation mechanisms in the entire architecture.",
             assumptions=[
-                "La base de datos Oracle 11g no soporta transacciones distribuidas con el Payment Service.",
+                "Oracle 11g does not support distributed transactions with the Payment Service.",
             ],
             needs_validation=[
-                "¿Hay un proceso de reconciliación manual con el CoreBanking?",
-                "¿Cómo se detecta y resuelve una transacción fantasma?",
+                "Is there a manual reconciliation process with CoreBanking?",
+                "How is a ghost transaction detected and resolved?",
             ],
             recommended_action=(
-                "Documentar el procedimiento de reconciliación manual antes del go-live — "
-                "quién lo ejecuta, cuándo, y cómo se detecta una transacción inconsistente. "
-                "Para el siguiente sprint: evaluar patrón Saga con compensaciones automáticas."
+                "Document the manual reconciliation procedure before go-live — "
+                "who runs it, when, and how an inconsistent transaction is detected. "
+                "For the next sprint: evaluate the Saga pattern with automatic compensations."
             ),
             category="risk",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Trazabilidad de auditoría requerida pero sin especificación de implementación",
+            title="Audit traceability required but implementation not specified",
             description=(
-                "El spec exige 'trazabilidad completa' por compliance, pero no define: "
-                "qué eventos se registran (inicio, validación antifraude, ejecución, notificación), "
-                "formato del log de auditoría, período de retención, ni integridad de los logs "
-                "(un log que puede modificarse no cumple con regulación financiera)."
+                "The spec requires 'full traceability' for compliance, but does not define: "
+                "which events are recorded (start, anti-fraud validation, execution, notification), "
+                "audit log format, retention period, or log integrity "
+                "(a log that can be modified does not meet financial regulation)."
             ),
             confidence="yellow",
             score=0.38,
-            evidence="'Todas las transacciones deben quedar auditadas con trazabilidad completa.'",
-            assumptions=["La regulación LATAM requiere logs inmutables con timestamp certificado."],
+            evidence="'All transactions must be audited with full traceability.'",
+            assumptions=["LATAM regulation requires immutable logs with certified timestamps."],
             needs_validation=[
-                "¿Cuál es el período mínimo de retención de auditoría según regulación?",
-                "¿Los logs deben ser inmutables (append-only)?",
+                "What is the minimum audit retention period per regulation?",
+                "Must logs be immutable (append-only)?",
             ],
             recommended_action=(
-                "Crear tabla `audit_log` append-only en PostgreSQL: "
+                "Create an append-only `audit_log` table in PostgreSQL: "
                 "timestamp, transaction_id, event_type, actor, payload. "
-                "Revisar con Legal el período de retención requerido (mínimo 5 años en varios mercados LATAM) "
-                "antes del go-live."
+                "Review with Legal the required retention period (minimum 5 years in several LATAM markets) "
+                "before go-live."
             ),
             category="gap",
             agent_id=aid,
@@ -480,13 +502,13 @@ def _risk_intelligence() -> AgentResult:
     ]
     return _result(
         aid, aname, "Shield", findings,
-        "El análisis de riesgos identifica vulnerabilidades críticas en seguridad y resiliencia. "
-        "El riesgo más severo es la ausencia de circuit breaker ante el CoreBanking legacy, "
-        "que garantiza un fallo en cascada ante la primera degradación del sistema legado. "
-        "En segundo lugar, el cumplimiento PCI-DSS está declarado pero no implementado: "
-        "no hay definición de cifrado para datos IBAN/SWIFT ni gestión de claves. "
-        "Adicionalmente, la ausencia de rollback transaccional creará inconsistencias de datos "
-        "desde el primer incidente de producción.",
+        "The risk analysis identifies critical security and resilience vulnerabilities. "
+        "The most severe risk is the absence of a circuit breaker to the legacy CoreBanking, "
+        "which guarantees a cascading failure at the first legacy system degradation. "
+        "Second, PCI-DSS compliance is declared but not implemented: "
+        "there is no encryption definition for IBAN/SWIFT data or key management. "
+        "Additionally, the lack of transactional rollback will create data inconsistencies "
+        "from the first production incident.",
     )
 
 
@@ -497,92 +519,92 @@ def _business_impact() -> AgentResult:
     aid, aname = "business_impact", "Business Impact"
     findings = [
         _f(
-            title="Incumplimiento del SLA regulatorio: multas cuantificables desde el día 1",
+            title="Regulatory SLA non-compliance: quantifiable fines from day one",
             description=(
-                "Dado que la arquitectura no puede cumplir el SLA de 10 segundos (análisis del Architecture Validator), "
-                "NovaBank estará en incumplimiento regulatorio desde el lanzamiento. "
-                "En mercados LATAM, las multas por incumplimiento de pagos instantáneos van de $50K a $500K USD "
-                "por trimestre. El costo de rediseñar la arquitectura ahora es menor que la primera multa."
+                "Since the architecture cannot meet the 10-second SLA (per Architecture Validator analysis), "
+                "NovaBank will be in regulatory non-compliance from launch. "
+                "In LATAM markets, fines for instant payment SLA violations range from $50K to $500K USD "
+                "per quarter. The cost of redesigning the architecture now is less than the first fine."
             ),
             confidence="red",
             score=0.09,
-            evidence="SLA regulatorio de 10s + latencias arquitectónicas de 5-18s = incumplimiento estructural.",
-            assumptions=["Los reguladores LATAM aplican multas por incumplimiento de SLA en pagos instantáneos."],
+            evidence="Regulatory SLA of 10s + architectural latencies of 5-18s = structural non-compliance.",
+            assumptions=["LATAM regulators enforce fines for SLA violations in instant payments."],
             needs_validation=[
-                "¿Cuál es el régimen de multas aplicable en cada mercado objetivo?",
-                "¿Hay un período de gracia regulatorio para nuevos entrantes?",
+                "What is the applicable fine regime in each target market?",
+                "Is there a regulatory grace period for new entrants?",
             ],
             recommended_action=(
-                "Presentar este análisis a los stakeholders antes de aprobar el MVP. "
-                "El costo del rediseño arquitectónico (2-3 sprints) es menor que la primera multa. "
-                "Priorizar la arquitectura asíncrona con respuesta 202 Accepted."
+                "Present this analysis to stakeholders before approving the MVP. "
+                "The cost of the architectural redesign (2-3 sprints) is less than the first fine. "
+                "Prioritize async architecture with 202 Accepted response."
             ),
             category="cost",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Crecimiento 300% con infraestructura on-premise: costo operacional sin techo",
+            title="300% growth with on-premise infrastructure: uncapped operational cost",
             description=(
-                "El crecimiento proyectado del 300% en 6 meses con despliegue manual on-premise "
-                "implica contratar y aprovisionar hardware físico en múltiples ocasiones. "
-                "El costo marginal por unidad de capacidad en on-premise es 3-5x mayor que cloud "
-                "a este ritmo de crecimiento. Además, el tiempo de aprovisionamiento (semanas) "
-                "no podrá seguir picos de demanda."
+                "The projected 300% growth in 6 months with manual on-premise deployment "
+                "implies hiring and provisioning physical hardware multiple times. "
+                "The marginal cost per capacity unit on-premise is 3-5x higher than cloud "
+                "at this growth rate. Additionally, provisioning time (weeks) "
+                "cannot follow demand peaks."
             ),
             confidence="red",
             score=0.13,
-            evidence="'Infraestructura actual: on-premise, sin orquestación de contenedores, escalamiento manual.'",
-            assumptions=["El crecimiento del 300% es el escenario base, no el optimista."],
-            needs_validation=["¿Existe presupuesto aprobado para infraestructura de escalamiento?"],
+            evidence="'Current infrastructure: on-premise, no container orchestration, manual scaling.'",
+            assumptions=["300% growth is the base scenario, not the optimistic one."],
+            needs_validation=["Is there an approved budget for scaling infrastructure?"],
             recommended_action=(
-                "Definir en el roadmap post-MVP un punto de migración cloud explícito (ej: al superar 100 TPS). "
-                "Incluir análisis TCO comparativo cloud vs. on-premise "
-                "antes de que el crecimiento haga la migración urgente y costosa."
+                "Define in the post-MVP roadmap an explicit cloud migration trigger (e.g., at 100 TPS). "
+                "Include a comparative TCO analysis cloud vs. on-premise "
+                "before growth makes the migration urgent and costly."
             ),
             category="cost",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Latencia visible al usuario impacta conversión frente a competidores",
+            title="User-visible latency impacts conversion against competitors",
             description=(
-                "Wise y Remitly ofrecen confirmación en menos de 3 segundos. "
-                "Con la arquitectura actual, NovaBank mostrará tiempos de espera de 5-18 segundos. "
-                "Estudios de UX en pagos muestran abandono del 40% por cada 3 segundos adicionales de espera. "
-                "Esto impacta directamente la tasa de adopción del producto."
+                "Wise and Remitly offer confirmation in under 3 seconds. "
+                "With the current architecture, NovaBank will show wait times of 5-18 seconds. "
+                "UX studies in payments show 40% abandonment for every 3 additional seconds of wait. "
+                "This directly impacts product adoption rate."
             ),
             confidence="yellow",
             score=0.35,
-            evidence="Latencias documentadas: CoreBanking 2-15s + FraudShield 3s vs. Wise/Remitly <3s.",
-            assumptions=["El usuario corporativo tiene alternativas disponibles (Wise Business, Remitly for Business)."],
-            needs_validation=["¿Cuál es la tasa de abandono aceptable para el equipo de producto?"],
+            evidence="Documented latencies: CoreBanking 2-15s + FraudShield 3s vs. Wise/Remitly <3s.",
+            assumptions=["Corporate users have alternatives available (Wise Business, Remitly for Business)."],
+            needs_validation=["What is the acceptable abandonment rate for the product team?"],
             recommended_action=(
-                "Implementar respuesta inmediata de 202 Accepted con UI de estado 'procesando' "
-                "y barra de progreso. El usuario percibe rapidez aunque el backend tarde 10s. "
-                "Este cambio requiere el rediseño asíncrono pero tiene el mayor impacto en UX."
+                "Implement immediate 202 Accepted response with a 'processing' status UI "
+                "and progress bar. The user perceives speed even if the backend takes 10s. "
+                "This change requires the async redesign but has the greatest UX impact."
             ),
             category="cost",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Deuda técnica de Oracle 11g bloqueará evolución del producto en 6 meses",
+            title="Oracle 11g technical debt will block product evolution in 6 months",
             description=(
-                "Oracle 11g (sin soporte oficial desde 2013) no soporta transacciones distribuidas modernas "
-                "ni JSON nativo. Cada feature posterior que requiera nuevas consultas o esquemas "
-                "implicará workarounds costosos o una migración no planificada. "
-                "El costo de migración aumenta exponencialmente con el volumen de datos."
+                "Oracle 11g (officially unsupported since 2013) does not support modern distributed transactions "
+                "or native JSON. Every subsequent feature requiring new queries or schemas "
+                "will involve costly workarounds or an unplanned migration. "
+                "Migration cost grows exponentially with data volume."
             ),
             confidence="yellow",
             score=0.4,
-            evidence="'Base de datos de cuentas está en Oracle 11g (no soporta transacciones distribuidas modernas)'",
-            assumptions=["El volumen de datos crecerá con el 300% de crecimiento proyectado."],
-            needs_validation=["¿Existe un roadmap de migración de Oracle 11g?"],
+            evidence="'Account database is on Oracle 11g (does not support modern distributed transactions)'",
+            assumptions=["Data volume will grow with the projected 300% growth."],
+            needs_validation=["Is there a migration roadmap for Oracle 11g?"],
             recommended_action=(
-                "Crear una capa de abstracción (patrón Repositorio) sobre Oracle 11g desde el día 1. "
-                "Esto aísla la deuda técnica, facilita la futura migración "
-                "y no requiere tiempo de desarrollo adicional — solo disciplina arquitectónica."
+                "Create an abstraction layer (Repository pattern) over Oracle 11g from day one. "
+                "This isolates the technical debt, facilitates the future migration, "
+                "and requires no additional development time — just architectural discipline."
             ),
             category="cost",
             agent_id=aid,
@@ -591,12 +613,12 @@ def _business_impact() -> AgentResult:
     ]
     return _result(
         aid, aname, "TrendingUp", findings,
-        "El análisis de impacto de negocio identifica riesgos financieros directos y cuantificables. "
-        "El más urgente: la arquitectura garantiza incumplimiento del SLA regulatorio, "
-        "con multas potenciales que superan el costo del proyecto desde el primer trimestre. "
-        "El crecimiento proyectado del 300% es incompatible con la infraestructura on-premise actual, "
-        "creando un techo de escalamiento que llegará antes de que el producto alcance rentabilidad. "
-        "Se recomienda presentar este análisis a los stakeholders de negocio antes de aprobar el MVP.",
+        "The business impact analysis identifies direct and quantifiable financial risks. "
+        "The most urgent: the architecture guarantees regulatory SLA non-compliance, "
+        "with potential fines exceeding the project cost from the first quarter. "
+        "The projected 300% growth is incompatible with the current on-premise infrastructure, "
+        "creating a scaling ceiling that will arrive before the product reaches profitability. "
+        "This analysis should be presented to business stakeholders before approving the MVP.",
     )
 
 
@@ -607,94 +629,94 @@ def _accessibility_advocate() -> AgentResult:
     aid, aname = "accessibility_advocate", "Accessibility Advocate"
     findings = [
         _f(
-            title="Polling sin aria-live: usuarios con lector de pantalla no reciben actualizaciones",
+            title="Polling without aria-live: screen reader users receive no status updates",
             description=(
-                "El estado del pago se actualiza mediante polling cada 3 segundos, "
-                "pero sin regiones aria-live los cambios de estado son invisibles para lectores de pantalla. "
-                "Un usuario con discapacidad visual no sabrá que su pago fue procesado hasta que "
-                "explore manualmente la página, violando WCAG 2.1 criterio 4.1.3 (Status Messages)."
+                "Payment status is updated via polling every 3 seconds, "
+                "but without aria-live regions, status changes are invisible to screen readers. "
+                "A visually impaired user will not know their payment was processed until they "
+                "manually explore the page, violating WCAG 2.1 criterion 4.1.3 (Status Messages)."
             ),
             confidence="red",
             score=0.12,
-            evidence="'React SPA con polling cada 3 segundos para actualizar estado de pagos' — sin mención de aria-live.",
+            evidence="'React SPA with polling every 3 seconds to update payment status' — no mention of aria-live.",
             assumptions=[],
-            needs_validation=["¿El componente de estado de pago tiene aria-live='polite' o aria-atomic?"],
+            needs_validation=["Does the payment status component have aria-live='polite' or aria-atomic?"],
             recommended_action=(
-                "Agregar `aria-live='polite'` al contenedor del estado del pago. "
-                "Al cambiar el estado, actualizar el texto del elemento para que el lector de pantalla lo anuncie. "
-                "Es un cambio de 10 minutos que resuelve una brecha crítica de WCAG 4.1.3."
+                "Add `aria-live='polite'` to the payment status container. "
+                "When status changes, update the element's text so screen readers announce it. "
+                "This is a 10-minute change that resolves a critical WCAG 4.1.3 gap."
             ),
             category="accessibility",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Diseño mobile-last excluye tecnologías de asistencia más usadas",
+            title="Mobile-last design excludes most-used assistive technologies",
             description=(
-                "El spec define el diseño 'principalmente para escritorio' con móvil como mejora futura. "
-                "En LATAM, el 68% de las tecnologías de asistencia se usan en dispositivos móviles. "
-                "Un sistema de pagos corporativos inaccessible en móvil excluye a usuarios con "
-                "discapacidad motora que usan conmutadores, usuarios con baja visión que amplifican "
-                "pantalla en su teléfono, y usuarios de TalkBack/VoiceOver en Android/iOS."
+                "The spec defines the design 'primarily for desktop' with mobile as a future improvement. "
+                "In LATAM, 68% of assistive technologies are used on mobile devices. "
+                "A corporate payment system inaccessible on mobile excludes users with "
+                "motor disabilities using switches, low-vision users who magnify their phone screen, "
+                "and TalkBack/VoiceOver users on Android/iOS."
             ),
             confidence="red",
             score=0.15,
-            evidence="'Diseñado principalmente para escritorio; móvil como mejora futura'",
-            assumptions=["Los clientes corporativos en LATAM autorizan pagos frecuentemente desde móvil."],
+            evidence="'Designed primarily for desktop; mobile as future improvement'",
+            assumptions=["Corporate clients in LATAM frequently authorize payments from mobile."],
             needs_validation=[
-                "¿Cuál es el porcentaje de usuarios que acceden desde móvil en el segmento B2B objetivo?",
+                "What percentage of users access from mobile in the target B2B segment?",
             ],
             recommended_action=(
-                "Incluir diseño responsive desde el primer componente del MVP. "
-                "El costo de retroalimentar responsive es 5-10x mayor que hacerlo desde el inicio. "
-                "Elena debe revisar los mockups antes de que el equipo comience el desarrollo del frontend."
+                "Include responsive design from the first MVP component. "
+                "The cost of retrofitting responsive is 5-10x higher than building it from the start. "
+                "Elena should review mockups before the team begins frontend development."
             ),
             category="accessibility",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Comprobante PDF sin especificación de accesibilidad de documento",
+            title="PDF receipt without document accessibility specification",
             description=(
-                "El spec menciona 'email de confirmación con comprobante en PDF' sin especificar "
-                "si el PDF cumple con PDF/UA (ISO 14289). Un PDF no etiquetado es ilegible para "
-                "lectores de pantalla. En contexto financiero, un comprobante inaccesible "
-                "puede tener implicaciones legales en mercados con regulación de accesibilidad."
+                "The spec mentions 'confirmation email with PDF receipt' without specifying "
+                "whether the PDF complies with PDF/UA (ISO 14289). An untagged PDF is unreadable by "
+                "screen readers. In a financial context, an inaccessible receipt "
+                "may have legal implications in markets with accessibility regulation."
             ),
             confidence="yellow",
             score=0.38,
-            evidence="'Email de confirmación con comprobante en PDF'",
-            assumptions=["El PDF se genera programáticamente, no es un documento escaneado."],
+            evidence="'Confirmation email with PDF receipt'",
+            assumptions=["The PDF is generated programmatically, not a scanned document."],
             needs_validation=[
-                "¿El generador de PDF soporta etiquetado semántico (PDF/UA)?",
-                "¿Los mercados objetivo tienen regulación de accesibilidad en documentos financieros?",
+                "Does the PDF generator support semantic tagging (PDF/UA)?",
+                "Do target markets have accessibility regulation for financial documents?",
             ],
             recommended_action=(
-                "Usar una librería de generación PDF con soporte PDF/UA: ReportLab con etiquetado o WeasyPrint. "
-                "Agregar como criterio de aceptación en US-003: "
-                "'El PDF de confirmación debe ser legible por lectores de pantalla (PDF/UA).'"
+                "Use a PDF generation library with PDF/UA support: ReportLab with tagging or WeasyPrint. "
+                "Add as acceptance criterion in US-003: "
+                "'The confirmation PDF must be readable by screen readers (PDF/UA).'"
             ),
             category="accessibility",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Mensajes de error de pago: dependencia visual no definida",
+            title="Payment error messages: visual dependency not defined",
             description=(
-                "El spec menciona notificaciones de error pero no define si los mensajes "
-                "usan solo color rojo para indicar fallo. Si es así, viola WCAG 1.4.1 (Use of Color). "
-                "Los mensajes de error deben incluir un ícono o texto que no dependa solo del color, "
-                "y deben estar marcados con role='alert' para lectores de pantalla."
+                "The spec mentions error notifications but does not define whether error messages "
+                "use only red color to indicate failure. If so, this violates WCAG 1.4.1 (Use of Color). "
+                "Error messages must include an icon or text that does not rely on color alone, "
+                "and must be marked with role='alert' for screen readers."
             ),
             confidence="yellow",
             score=0.42,
-            evidence="'En caso de fallo, el sistema debe indicar qué hacer a continuación' — sin especificación de diseño accesible.",
-            assumptions=["El equipo de diseño no tiene guidelines de accesibilidad definidas aún."],
-            needs_validation=["¿Existen mockups del estado de error que podamos revisar?"],
+            evidence="'In case of failure, the system must indicate what to do next' — no accessible design specification.",
+            assumptions=["The design team does not have defined accessibility guidelines yet."],
+            needs_validation=["Are there error state mockups available to review?"],
             recommended_action=(
-                "Definir en el design system: mensajes de error incluyen ícono + texto descriptivo, no solo color rojo. "
-                "Agregar `role='alert'` y `aria-live='assertive'` al componente de error. "
-                "Esta combinación cumple WCAG 1.4.1 y 4.1.3 simultáneamente."
+                "Define in the design system: error messages include icon + descriptive text, not just red color. "
+                "Add `role='alert'` and `aria-live='assertive'` to the error component. "
+                "This combination satisfies WCAG 1.4.1 and 4.1.3 simultaneously."
             ),
             category="accessibility",
             agent_id=aid,
@@ -703,12 +725,12 @@ def _accessibility_advocate() -> AgentResult:
     ]
     return _result(
         aid, aname, "Eye", findings,
-        "El análisis de accesibilidad identifica cuatro brechas contra WCAG 2.1 AA. "
-        "La más crítica: las actualizaciones de estado por polling no serán anunciadas a lectores de pantalla, "
-        "dejando a usuarios con discapacidad visual sin información sobre el resultado de sus pagos. "
-        "Adicionalmente, el enfoque mobile-last excluye a la mayoría de usuarios de tecnologías de asistencia en LATAM. "
-        "Estos problemas son significativamente más baratos de corregir en diseño que en código, "
-        "y Elena debería revisar los mockups antes de que el equipo comience el desarrollo del frontend.",
+        "The accessibility analysis identifies four gaps against WCAG 2.1 AA. "
+        "The most critical: polling status updates will not be announced to screen readers, "
+        "leaving visually impaired users without information about the outcome of their payments. "
+        "Additionally, the mobile-last approach excludes the majority of assistive technology users in LATAM. "
+        "These issues are significantly cheaper to fix in design than in code — "
+        "Elena should review the mockups before the team begins frontend development.",
     )
 
 
@@ -719,96 +741,96 @@ def _delivery_historian() -> AgentResult:
     aid, aname = "delivery_historian", "Delivery Historian"
     findings = [
         _f(
-            title="Sin idempotencia en pagos: este patrón causó 900K duplicados en producción",
+            title="No idempotency in payments: this pattern caused 900K duplicates in production",
             description=(
-                "En 2019, un banco europeo procesó 900,000 pagos duplicados en un incidente de 4 horas "
-                "causado exactamente por este patrón: reintentos sin clave de idempotencia sobre un gateway "
-                "de pagos síncrono. La recuperación tomó 3 semanas y costó €12M en reversiones. "
-                "La arquitectura actual de NovaBank reproduce este antipatrón exactamente."
+                "In 2019, a European bank processed 900,000 duplicate payments in a 4-hour incident "
+                "caused by exactly this pattern: retries without idempotency keys over a "
+                "synchronous payment gateway. Recovery took 3 weeks and cost €12M in reversals. "
+                "The current NovaBank architecture reproduces this antipattern exactly."
             ),
             confidence="red",
             score=0.08,
-            evidence="'Sin mecanismo de idempotencia implementado en las transacciones.' 'Sin lógica de retry implementada.'",
+            evidence="'No idempotency mechanism implemented in transactions.' 'No retry logic implemented.'",
             assumptions=[],
             needs_validation=[
-                "¿El CoreBanking puede detectar duplicados por su cuenta usando algún campo de referencia?",
+                "Can CoreBanking detect duplicates on its own using some reference field?",
             ],
             recommended_action=(
-                "Implementar idempotency keys ANTES del primer deploy a producción. "
-                "Patrón: UUID en header `X-Idempotency-Key`, almacenado en DB con TTL 24h, "
-                "rechazar duplicados con 409 Conflict. No es una mejora futura — es un requisito de seguridad."
+                "Implement idempotency keys BEFORE the first production deploy. "
+                "Pattern: UUID in `X-Idempotency-Key` header, stored in DB with 24h TTL, "
+                "reject duplicates with 409 Conflict. This is not a future improvement — it is a safety requirement."
             ),
             category="pattern",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Thread starvation por llamadas síncronas a legacy: patrón de cascading failure",
+            title="Thread starvation from synchronous calls to legacy: cascading failure pattern",
             description=(
-                "El 'thread starvation' por llamadas síncronas a sistemas lentos es uno de los patrones "
-                "de fallo más documentados en arquitecturas de microservicios. Amazon describió este antipatrón "
-                "en su post-mortem de 2004 como el origen del diseño de circuit breakers en AWS. "
-                "Sin timeout ni circuit breaker, el primer incidente del CoreBanking derribará toda la plataforma."
+                "Thread starvation from synchronous calls to slow systems is one of the most "
+                "documented failure patterns in microservice architectures. Amazon described this antipattern "
+                "in their 2004 post-mortem as the origin of circuit breaker design in AWS. "
+                "Without a timeout or circuit breaker, the first CoreBanking incident will bring down the entire platform."
             ),
             confidence="red",
             score=0.1,
-            evidence="'Sin timeout configurado para llamadas al CoreBanking (usa el default del cliente HTTP)'",
-            assumptions=["El CoreBanking tiene historial de degradaciones por ser sistema legacy on-premise."],
-            needs_validation=["¿Cuál es la disponibilidad histórica del CoreBanking en los últimos 12 meses?"],
+            evidence="'No timeout configured for CoreBanking calls (uses HTTP client default)'",
+            assumptions=["CoreBanking has a history of degradations as a legacy on-premise system."],
+            needs_validation=["What is the historical availability of CoreBanking over the last 12 months?"],
             recommended_action=(
-                "Implementar timeout explícito y circuit breaker esta semana — son cambios independientes que "
-                "pueden hacerse en paralelo en el primer sprint. "
-                "No hay justificación para no tenerlos desde el día 1."
+                "Implement explicit timeout and circuit breaker this week — they are independent changes "
+                "that can be done in parallel in the first sprint. "
+                "There is no justification for not having them from day one."
             ),
             category="pattern",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Integración SWIFT legacy en 6 semanas: históricamente el doble del tiempo estimado",
+            title="Legacy SWIFT integration in 6 weeks: historically takes double the estimate",
             description=(
-                "La integración con gateways SWIFT legacy tiene un historial consistente de tomar "
-                "el doble del tiempo estimado. El 'último 10%' — manejo de formatos edge case, "
-                "gestión de errores no documentados, certificaciones de seguridad — consume "
-                "típicamente el 50% del esfuerzo total. Priya y Daniel deben planificar con este factor."
+                "Integration with legacy SWIFT gateways has a consistent history of taking "
+                "double the estimated time. The 'last 10%' — handling edge-case formats, "
+                "undocumented errors, security certifications — typically consumes "
+                "50% of total effort. Priya and Daniel must plan with this factor in mind."
             ),
             confidence="yellow",
             score=0.35,
-            evidence="'El gateway SWIFT CoreBanking v2.1 es un sistema síncrono' — integración en 6 semanas totales.",
-            assumptions=["El equipo no tiene experiencia previa con el CoreBanking v2.1."],
+            evidence="'The SWIFT CoreBanking v2.1 gateway is a synchronous system' — integration in 6 total weeks.",
+            assumptions=["The team has no prior experience with CoreBanking v2.1."],
             needs_validation=[
-                "¿Hay documentación técnica completa del CoreBanking disponible desde el día 1?",
-                "¿Existe un ambiente de sandbox/staging del CoreBanking para pruebas?",
+                "Is complete CoreBanking technical documentation available from day one?",
+                "Is there a sandbox/staging CoreBanking environment for testing?",
             ],
             recommended_action=(
-                "Obtener acceso al ambiente de UAT del CoreBanking el día 1 del sprint. "
-                "Si no está disponible en la primera semana, escalar inmediatamente: "
-                "este es el mayor riesgo de timeline del proyecto."
+                "Get access to the CoreBanking UAT environment on sprint day one. "
+                "If not available in the first week, escalate immediately: "
+                "this is the project's greatest timeline risk."
             ),
             category="pattern",
             agent_id=aid,
             agent_name=aname,
         ),
         _f(
-            title="Despliegue manual en sistema financiero crítico: segunda causa de incidentes en prod",
+            title="Manual deployment on a critical financial system: second leading cause of production incidents",
             description=(
-                "Los errores humanos en despliegues manuales son la segunda causa más común de incidentes "
-                "en producción en sistemas financieros (después de los cambios de configuración). "
-                "Un deploy mal ejecutado en un sistema de pagos activo puede dejar transacciones "
-                "en vuelo en estado indefinido. Marcus debe incluir automatización de despliegue "
-                "como requisito, no como mejora futura."
+                "Human errors in manual deployments are the second most common cause of production incidents "
+                "in financial systems (after configuration changes). "
+                "A poorly executed deploy on an active payment system can leave in-flight transactions "
+                "in an undefined state. Marcus must include deployment automation "
+                "as a requirement, not a future improvement."
             ),
             confidence="yellow",
             score=0.38,
-            evidence="'Despliegue en VMs on-premise. Sin orquestación de contenedores. Escalamiento manual.'",
-            assumptions=["El equipo realizará múltiples deploys durante las 6 semanas de desarrollo."],
+            evidence="'Deployment on on-premise VMs. No container orchestration. Manual scaling.'",
+            assumptions=["The team will perform multiple deploys during the 6 weeks of development."],
             needs_validation=[
-                "¿Hay un proceso de rollback definido para el sistema de pagos en producción?",
+                "Is there a defined rollback process for the payment system in production?",
             ],
             recommended_action=(
-                "Implementar CI/CD básico con GitHub Actions en el primer sprint: "
-                "tests automáticos en PR + deploy automático a staging. "
-                "El deploy a producción puede seguir siendo manual, pero con un script validado y rollback documentado."
+                "Implement basic CI/CD with GitHub Actions in the first sprint: "
+                "automated tests on PR + automatic deploy to staging. "
+                "Production deploy can remain manual, but with a validated script and documented rollback."
             ),
             category="pattern",
             agent_id=aid,
@@ -817,11 +839,346 @@ def _delivery_historian() -> AgentResult:
     ]
     return _result(
         aid, aname, "History", findings,
-        "El análisis histórico identifica que NovaBank está reproduciendo tres patrones de fallo "
-        "bien documentados en la industria fintech. El más urgente: la ausencia de idempotencia "
-        "en un sistema con reintentos es el mismo patrón que causó 900,000 pagos duplicados "
-        "en un banco europeo en 2019. La recomendación es clara: implementar idempotencia y "
-        "circuit breaker son requisitos no negociables antes del lanzamiento. "
-        "Adicionalmente, la estimación de 6 semanas para la integración SWIFT legacy es optimista — "
-        "Marcus debería planificar con un buffer del 100% para la integración del CoreBanking.",
+        "The historical analysis identifies that NovaBank is reproducing three well-documented "
+        "failure patterns from the fintech industry. The most urgent: the absence of idempotency "
+        "in a system with retries is the same pattern that caused 900,000 duplicate payments "
+        "at a European bank in 2019. The recommendation is clear: implementing idempotency and "
+        "a circuit breaker are non-negotiable requirements before launch. "
+        "Additionally, the 6-week estimate for the legacy SWIFT integration is optimistic — "
+        "Marcus should plan with a 100% buffer for the CoreBanking integration.",
     )
+
+
+# ── Demo-mode translations (summaries + finding titles) ───────────────────────
+# Applied when DEMO_MODE=true and language != "en".
+# Descriptions/evidence/recommendations remain in English for demo brevity.
+
+_TRANSLATIONS: dict[str, dict[str, dict[str, Any]]] = {
+    "es": {
+        "spec_analyst": {
+            "summary": (
+                "El análisis de la especificación de NovaBank revela cinco problemas críticos. "
+                "El más urgente: el comportamiento del timeout de CoreBanking no está definido, "
+                "creando riesgo directo de pagos duplicados. Además, el SLA regulatorio de 10 "
+                "segundos no aparece en los criterios de aceptación, la historia de fallo del "
+                "pago es demasiado vaga para implementar, y existe una contradicción entre el "
+                "criterio de 'actualización automática' y el polling propuesto. Se recomienda "
+                "una sesión de refinamiento con Sofia y Daniel antes de comenzar el desarrollo."
+            ),
+            "titles": {
+                "CoreBanking timeout behavior not defined": (
+                    "Comportamiento del timeout de CoreBanking no definido"
+                ),
+                "US-003: 'What to do next' on failure not specified": (
+                    "US-003: 'Qué hacer' ante fallo no especificado"
+                ),
+                "10-second regulatory SLA absent from acceptance criteria": (
+                    "SLA regulatorio de 10 segundos ausente de los criterios de aceptación"
+                ),
+                "US-002: Auto-update mechanism contradicts technical notes": (
+                    "US-002: Mecanismo de actualización automática contradice notas técnicas"
+                ),
+                "Transaction history: export criteria incomplete": (
+                    "Historial de transacciones: criterios de exportación incompletos"
+                ),
+            },
+        },
+        "arch_validator": {
+            "summary": (
+                "La arquitectura propuesta tiene tres problemas bloqueantes para producción. "
+                "Primero, la combinación de latencias de CoreBanking (2-15s) y antifraude (3s) "
+                "hace matemáticamente imposible cumplir el SLA regulatorio de 10 segundos. "
+                "Segundo, la ausencia de timeout en las llamadas a CoreBanking y la falta de "
+                "circuit breaker crean riesgo de falla en cascada. Tercero, sin idempotencia, "
+                "los reintentos generarán pagos duplicados con certeza. Recomendaciones "
+                "prioritarias: desacoplamiento async de CoreBanking, timeout explícito e "
+                "idempotencia."
+            ),
+            "titles": {
+                "Synchronous CoreBanking (2-15s) makes 10s SLA mathematically impossible": (
+                    "CoreBanking síncrono (2-15s) hace el SLA de 10s matemáticamente imposible"
+                ),
+                "Single-instance API Gateway: single point of failure in a financial system": (
+                    "API Gateway de instancia única: punto único de falla en sistema financiero"
+                ),
+                "No timeout on CoreBanking calls: thread starvation risk": (
+                    "Sin timeout en llamadas a CoreBanking: riesgo de agotamiento de hilos"
+                ),
+                "No idempotency: retries will generate duplicate payments": (
+                    "Sin idempotencia: los reintentos generarán pagos duplicados"
+                ),
+                "Synchronous notifications without queue: silent loss on SendGrid failure": (
+                    "Notificaciones síncronas sin cola: pérdida silenciosa ante fallo de SendGrid"
+                ),
+            },
+        },
+        "risk_intelligence": {
+            "summary": (
+                "El análisis de riesgos identifica vulnerabilidades críticas de seguridad y "
+                "resiliencia. El riesgo más severo es la ausencia de un circuit breaker al "
+                "CoreBanking legado, lo que garantiza una falla en cascada en la primera "
+                "degradación del sistema legado. Segundo, el cumplimiento PCI-DSS está declarado "
+                "pero no implementado: no hay definición de cifrado para datos IBAN/SWIFT ni "
+                "gestión de claves. Adicionalmente, la falta de rollback transaccional generará "
+                "inconsistencias de datos desde el primer incidente en producción."
+            ),
+            "titles": {
+                "No circuit breaker to CoreBanking: guaranteed cascading failure": (
+                    "Sin circuit breaker a CoreBanking: falla en cascada garantizada"
+                ),
+                "PCI-DSS Level 1 declared but account data encryption not defined": (
+                    "PCI-DSS Nivel 1 declarado pero cifrado de datos de cuenta no definido"
+                ),
+                "No rate limiting on the API Gateway": (
+                    "Sin rate limiting en el API Gateway"
+                ),
+                "No transactional rollback strategy": (
+                    "Sin estrategia de rollback transaccional"
+                ),
+                "Audit traceability required but implementation not specified": (
+                    "Trazabilidad de auditoría requerida pero implementación no especificada"
+                ),
+            },
+        },
+        "business_impact": {
+            "summary": (
+                "El análisis de impacto de negocio identifica riesgos financieros directos y "
+                "cuantificables. El más urgente: la arquitectura garantiza incumplimiento "
+                "regulatorio del SLA, con multas potenciales que superan el costo del proyecto "
+                "desde el primer trimestre. El crecimiento proyectado del 300% es incompatible "
+                "con la infraestructura on-premise actual, creando un techo de escalabilidad "
+                "que llegará antes de que el producto alcance la rentabilidad. Este análisis "
+                "debe presentarse a los stakeholders de negocio antes de aprobar el MVP."
+            ),
+            "titles": {
+                "Regulatory SLA non-compliance: quantifiable fines from day one": (
+                    "Incumplimiento SLA regulatorio: multas cuantificables desde el primer día"
+                ),
+                "300% growth with on-premise infrastructure: uncapped operational cost": (
+                    "Crecimiento 300% con infraestructura on-premise: costo operacional sin techo"
+                ),
+                "User-visible latency impacts conversion against competitors": (
+                    "Latencia visible al usuario impacta conversión frente a competidores"
+                ),
+                "Oracle 11g technical debt will block product evolution in 6 months": (
+                    "Deuda técnica Oracle 11g bloqueará evolución del producto en 6 meses"
+                ),
+            },
+        },
+        "accessibility_advocate": {
+            "summary": (
+                "El análisis de accesibilidad identifica cuatro brechas contra WCAG 2.1 AA. "
+                "La más crítica: las actualizaciones de estado por polling no serán anunciadas "
+                "a los lectores de pantalla, dejando a los usuarios con discapacidad visual sin "
+                "información sobre el resultado de sus pagos. Además, el enfoque mobile-last "
+                "excluye a la mayoría de los usuarios de tecnologías de asistencia en LATAM. "
+                "Estos problemas son significativamente más baratos de resolver en diseño que "
+                "en código — Elena debería revisar los mockups antes de que el equipo comience "
+                "el desarrollo frontend."
+            ),
+            "titles": {
+                "Polling without aria-live: screen reader users receive no status updates": (
+                    "Polling sin aria-live: usuarios de lector de pantalla sin actualizaciones"
+                ),
+                "Mobile-last design excludes most-used assistive technologies": (
+                    "Diseño mobile-last excluye las tecnologías de asistencia más usadas"
+                ),
+                "PDF receipt without document accessibility specification": (
+                    "Recibo PDF sin especificación de accesibilidad del documento"
+                ),
+                "Payment error messages: visual dependency not defined": (
+                    "Mensajes de error de pago: dependencia visual no definida"
+                ),
+            },
+        },
+        "delivery_historian": {
+            "summary": (
+                "El análisis histórico identifica que NovaBank está reproduciendo tres patrones "
+                "de falla bien documentados de la industria fintech. El más urgente: la ausencia "
+                "de idempotencia en un sistema con reintentos es el mismo patrón que causó "
+                "900,000 pagos duplicados en un banco europeo en 2019. La recomendación es "
+                "clara: implementar idempotencia y circuit breaker son requisitos no negociables "
+                "antes del lanzamiento. Además, la estimativa de 6 semanas para la integración "
+                "con el SWIFT legado es optimista — Marcus debería planificar con 100% de buffer "
+                "para la integración con CoreBanking."
+            ),
+            "titles": {
+                "No idempotency in payments: this pattern caused 900K duplicates in production": (
+                    "Sin idempotencia en pagos: este patrón causó 900K duplicados en producción"
+                ),
+                "Thread starvation from synchronous calls to legacy: cascading failure pattern": (
+                    "Agotamiento de hilos por llamadas síncronas al legado: falla en cascada"
+                ),
+                "Legacy SWIFT integration in 6 weeks: historically takes double the estimate": (
+                    "Integración SWIFT legada en 6 semanas: históricamente toma el doble"
+                ),
+                "Manual deployment on a critical financial system: second leading cause of production incidents": (
+                    "Deploy manual en sistema financiero crítico: segunda causa de incidentes"
+                ),
+            },
+        },
+    },
+    "pt": {
+        "spec_analyst": {
+            "summary": (
+                "A análise da especificação do NovaBank revela cinco problemas críticos. "
+                "O mais urgente: o comportamento do timeout do CoreBanking não está definido, "
+                "criando risco direto de pagamentos duplicados. Além disso, o SLA regulatório "
+                "de 10 segundos não aparece nos critérios de aceitação, a história de falha do "
+                "pagamento é muito vaga para implementar, e há uma contradição entre o critério "
+                "de 'atualização automática' e o polling proposto. Recomenda-se uma sessão de "
+                "refinamento com Sofia e Daniel antes do início do desenvolvimento."
+            ),
+            "titles": {
+                "CoreBanking timeout behavior not defined": (
+                    "Comportamento do timeout do CoreBanking não definido"
+                ),
+                "US-003: 'What to do next' on failure not specified": (
+                    "US-003: 'O que fazer' em caso de falha não especificado"
+                ),
+                "10-second regulatory SLA absent from acceptance criteria": (
+                    "SLA regulatório de 10 segundos ausente dos critérios de aceitação"
+                ),
+                "US-002: Auto-update mechanism contradicts technical notes": (
+                    "US-002: Mecanismo de atualização automática contradiz as notas técnicas"
+                ),
+                "Transaction history: export criteria incomplete": (
+                    "Histórico de transações: critérios de exportação incompletos"
+                ),
+            },
+        },
+        "arch_validator": {
+            "summary": (
+                "A arquitetura proposta tem três problemas bloqueantes para produção. Primeiro, "
+                "a combinação de latências do CoreBanking (2-15s) e antifraude (3s) torna "
+                "matematicamente impossível cumprir o SLA regulatório de 10 segundos. Segundo, "
+                "a ausência de timeout nas chamadas ao CoreBanking e a falta de circuit breaker "
+                "criam risco de falha em cascata. Terceiro, sem idempotência, os "
+                "reprocessamentos gerarão pagamentos duplicados com certeza. Recomendações "
+                "prioritárias: desacoplamento async do CoreBanking, timeout explícito e "
+                "idempotência."
+            ),
+            "titles": {
+                "Synchronous CoreBanking (2-15s) makes 10s SLA mathematically impossible": (
+                    "CoreBanking síncrono (2-15s) torna o SLA de 10s matematicamente impossível"
+                ),
+                "Single-instance API Gateway: single point of failure in a financial system": (
+                    "API Gateway de instância única: ponto único de falha em sistema financeiro"
+                ),
+                "No timeout on CoreBanking calls: thread starvation risk": (
+                    "Sem timeout nas chamadas ao CoreBanking: risco de esgotamento de threads"
+                ),
+                "No idempotency: retries will generate duplicate payments": (
+                    "Sem idempotência: reprocessamentos gerarão pagamentos duplicados"
+                ),
+                "Synchronous notifications without queue: silent loss on SendGrid failure": (
+                    "Notificações síncronas sem fila: perda silenciosa em falha do SendGrid"
+                ),
+            },
+        },
+        "risk_intelligence": {
+            "summary": (
+                "A análise de riscos identifica vulnerabilidades críticas de segurança e "
+                "resiliência. O risco mais severo é a ausência de um circuit breaker para o "
+                "CoreBanking legado, o que garante falha em cascata na primeira degradação do "
+                "sistema legado. Segundo, a conformidade PCI-DSS está declarada mas não "
+                "implementada: não há definição de criptografia para dados IBAN/SWIFT nem gestão "
+                "de chaves. Adicionalmente, a falta de rollback transacional gerará "
+                "inconsistências de dados desde o primeiro incidente em produção."
+            ),
+            "titles": {
+                "No circuit breaker to CoreBanking: guaranteed cascading failure": (
+                    "Sem circuit breaker para o CoreBanking: falha em cascata garantida"
+                ),
+                "PCI-DSS Level 1 declared but account data encryption not defined": (
+                    "PCI-DSS Nível 1 declarado mas criptografia de dados de conta não definida"
+                ),
+                "No rate limiting on the API Gateway": (
+                    "Sem rate limiting no API Gateway"
+                ),
+                "No transactional rollback strategy": (
+                    "Sem estratégia de rollback transacional"
+                ),
+                "Audit traceability required but implementation not specified": (
+                    "Rastreabilidade de auditoria exigida mas implementação não especificada"
+                ),
+            },
+        },
+        "business_impact": {
+            "summary": (
+                "A análise de impacto de negócio identifica riscos financeiros diretos e "
+                "quantificáveis. O mais urgente: a arquitetura garante descumprimento regulatório "
+                "do SLA, com multas potenciais que superam o custo do projeto já no primeiro "
+                "trimestre. O crescimento projetado de 300% é incompatível com a infraestrutura "
+                "on-premise atual, criando um teto de escalabilidade que chegará antes de o "
+                "produto atingir a rentabilidade. Esta análise deve ser apresentada aos "
+                "stakeholders de negócio antes de aprovar o MVP."
+            ),
+            "titles": {
+                "Regulatory SLA non-compliance: quantifiable fines from day one": (
+                    "Descumprimento do SLA regulatório: multas quantificáveis desde o primeiro dia"
+                ),
+                "300% growth with on-premise infrastructure: uncapped operational cost": (
+                    "Crescimento de 300% com infraestrutura on-premise: custo operacional sem teto"
+                ),
+                "User-visible latency impacts conversion against competitors": (
+                    "Latência visível ao usuário impacta conversão frente aos concorrentes"
+                ),
+                "Oracle 11g technical debt will block product evolution in 6 months": (
+                    "Dívida técnica Oracle 11g bloqueará a evolução do produto em 6 meses"
+                ),
+            },
+        },
+        "accessibility_advocate": {
+            "summary": (
+                "A análise de acessibilidade identifica quatro lacunas em relação ao WCAG 2.1 AA. "
+                "A mais crítica: as atualizações de status por polling não serão anunciadas pelos "
+                "leitores de tela, deixando usuários com deficiência visual sem informação sobre "
+                "o resultado de seus pagamentos. Além disso, a abordagem mobile-last exclui a "
+                "maioria dos usuários de tecnologias assistivas na LATAM. Esses problemas são "
+                "significativamente mais baratos de resolver no design do que no código — Elena "
+                "deve revisar os mockups antes de o time iniciar o desenvolvimento frontend."
+            ),
+            "titles": {
+                "Polling without aria-live: screen reader users receive no status updates": (
+                    "Polling sem aria-live: usuários de leitor de tela sem atualizações de status"
+                ),
+                "Mobile-last design excludes most-used assistive technologies": (
+                    "Design mobile-last exclui as tecnologias assistivas mais usadas"
+                ),
+                "PDF receipt without document accessibility specification": (
+                    "Recibo PDF sem especificação de acessibilidade do documento"
+                ),
+                "Payment error messages: visual dependency not defined": (
+                    "Mensagens de erro de pagamento: dependência visual não definida"
+                ),
+            },
+        },
+        "delivery_historian": {
+            "summary": (
+                "A análise histórica identifica que o NovaBank está reproduzindo três padrões "
+                "de falha bem documentados da indústria fintech. O mais urgente: a ausência de "
+                "idempotência em um sistema com reprocessamentos é o mesmo padrão que causou "
+                "900.000 pagamentos duplicados em um banco europeu em 2019. A recomendação é "
+                "clara: implementar idempotência e circuit breaker são requisitos não "
+                "negociáveis antes do lançamento. Além disso, a estimativa de 6 semanas para a "
+                "integração com o SWIFT legado é otimista — Marcus deve planejar com 100% de "
+                "buffer para a integração com o CoreBanking."
+            ),
+            "titles": {
+                "No idempotency in payments: this pattern caused 900K duplicates in production": (
+                    "Sem idempotência em pagamentos: padrão causou 900K duplicados em produção"
+                ),
+                "Thread starvation from synchronous calls to legacy: cascading failure pattern": (
+                    "Esgotamento de threads por chamadas síncronas ao legado: falha em cascata"
+                ),
+                "Legacy SWIFT integration in 6 weeks: historically takes double the estimate": (
+                    "Integração SWIFT legada em 6 semanas: historicamente leva o dobro"
+                ),
+                "Manual deployment on a critical financial system: second leading cause of production incidents": (
+                    "Deploy manual em sistema financeiro crítico: segunda causa de incidentes"
+                ),
+            },
+        },
+    },
+}
