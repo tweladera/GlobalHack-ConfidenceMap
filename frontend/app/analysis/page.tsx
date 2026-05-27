@@ -8,6 +8,10 @@ import FindingDetail from "@/components/FindingDetail";
 import AccessibleSummary from "@/components/AccessibleSummary";
 import DecisionTable from "@/components/DecisionTable";
 import HeatMap from "@/components/HeatMap";
+import BacklogModal from "@/components/BacklogModal";
+import ChatPanel from "@/components/ChatPanel";
+import { generateMarkdown, downloadMarkdown } from "@/lib/export";
+import { saveAnalysis } from "@/lib/history";
 import type { AgentState, Finding, SSEEvent } from "@/types";
 import { AGENT_DEFINITIONS } from "@/types";
 import { useI18n } from "@/lib/i18n";
@@ -44,6 +48,8 @@ export default function AnalysisPage() {
   const [showTable, setShowTable] = useState(false);
   const [textMode, setTextMode] = useState(false);
   const [showHeatMap, setShowHeatMap] = useState(false);
+  const [showBacklog, setShowBacklog] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -137,12 +143,25 @@ export default function AnalysisPage() {
         setIsComplete(true);
         setTimeoutWarning(false);
         sessionStorage.removeItem("analysis_id"); // prevent re-run on page reload
-        if (event.confidence_distribution) {
-          setConfidenceDist(event.confidence_distribution);
-        }
-        if (event.global_confidence_score != null) {
-          setGlobalScore(event.global_confidence_score);
-        }
+        const dist = event.confidence_distribution ?? { green: 0, yellow: 0, red: 0 };
+        if (event.confidence_distribution) setConfidenceDist(dist);
+        if (event.global_confidence_score != null) setGlobalScore(event.global_confidence_score);
+        // Save to localStorage history
+        setAgents((currentAgents) => {
+          setAllFindings((currentFindings) => {
+            const specPreview = (sessionStorage.getItem("analysis_spec") ?? "").slice(0, 120);
+            saveAnalysis({
+              timestamp: Date.now(),
+              specPreview,
+              globalScore: event.global_confidence_score ?? null,
+              totalFindings: currentFindings.length,
+              confidenceDist: dist,
+              agents: currentAgents,
+            });
+            return currentFindings;
+          });
+          return currentAgents;
+        });
         es.close();
       }
 
@@ -233,43 +252,15 @@ export default function AnalysisPage() {
   const progress = Math.round((completedCount / agents.length) * 100);
 
   const copyExecutiveSummary = async () => {
-    const reds = allFindings.filter((f) => f.confidence === "red");
-    const yellows = allFindings.filter((f) => f.confidence === "yellow");
-    const greens = allFindings.filter((f) => f.confidence === "green");
-    const score = globalScore != null ? `${Math.round(globalScore * 100)}%` : "—";
-
-    const lines = [
-      "# Confidence Map — Executive Summary",
-      "",
-      `Global confidence: ${score}`,
-      `Total: ${allFindings.length} findings (${reds.length} critical · ${yellows.length} inferred · ${greens.length} confirmed)`,
-      "",
-    ];
-
-    if (reds.length > 0) {
-      lines.push(`## Critical — High uncertainty (${reds.length})`);
-      reds.forEach((f) => {
-        lines.push(`- **${f.title}** [${f.agent_name}]`);
-        if (f.recommended_action) lines.push(`  → ${f.recommended_action}`);
-      });
-      lines.push("");
-    }
-    if (yellows.length > 0) {
-      lines.push(`## Inferred — Reasonably assumed (${yellows.length})`);
-      yellows.forEach((f) => {
-        lines.push(`- **${f.title}** [${f.agent_name}]`);
-        if (f.recommended_action) lines.push(`  → ${f.recommended_action}`);
-      });
-      lines.push("");
-    }
-    if (greens.length > 0) {
-      lines.push(`## Confirmed — Explicitly defined (${greens.length})`);
-      greens.forEach((f) => lines.push(`- ${f.title} [${f.agent_name}]`));
-    }
-
-    await navigator.clipboard.writeText(lines.join("\n"));
+    const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
+    await navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleExport = () => {
+    const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
+    downloadMarkdown(content);
   };
 
   const activeView = textMode ? "text" : showHeatMap ? "heat" : showTable ? "table" : "map";
@@ -361,6 +352,37 @@ export default function AnalysisPage() {
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Action buttons: Export · Backlog · Chat */}
+        {isComplete && allFindings.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono"
+              title="Download full analysis as Markdown"
+            >
+              Export .md
+            </button>
+            <button
+              onClick={() => setShowBacklog(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono"
+              title="Generate backlog tickets from findings"
+            >
+              Backlog
+            </button>
+            <button
+              onClick={() => setShowChat((v) => !v)}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors font-mono ${
+                showChat
+                  ? "bg-accent border-accent text-white"
+                  : "border-surface-border text-slate-400 hover:text-slate-200"
+              }`}
+              title="Ask AI about the findings"
+            >
+              Ask AI
+            </button>
           </div>
         )}
 
@@ -771,6 +793,19 @@ export default function AnalysisPage() {
       </main>
 
       <AccessibleSummary agents={agents} findings={allFindings} isComplete={isComplete} />
+
+      {showBacklog && (
+        <BacklogModal findings={allFindings} onClose={() => setShowBacklog(false)} />
+      )}
+
+      {showChat && (
+        <ChatPanel
+          findings={allFindings}
+          agents={agents}
+          globalScore={globalScore}
+          onClose={() => setShowChat(false)}
+        />
+      )}
     </div>
   );
 }

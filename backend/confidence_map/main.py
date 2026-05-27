@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from confidence_map.api.analysis import router as analysis_router
+from confidence_map.api.chat import router as chat_router
 from confidence_map.core.settings import get_settings
 
 
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(analysis_router)
+    app.include_router(chat_router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
