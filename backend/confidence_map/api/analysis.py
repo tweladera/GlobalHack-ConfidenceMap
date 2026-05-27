@@ -62,8 +62,8 @@ async def translate_results(request: TranslateRequest) -> TranslateResponse:
     """
     settings = get_settings()
     if settings.demo_mode:
-        agents = get_mock_results(request.language)
-        return TranslateResponse(agents=agents)
+        agents_dict = get_mock_results(request.language)
+        return TranslateResponse(agents=list(agents_dict.values()))
     raise HTTPException(status_code=501, detail="Post-analysis translation requires DEMO_MODE=true")
 
 
