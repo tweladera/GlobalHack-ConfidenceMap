@@ -121,6 +121,11 @@ async def _translate_agent(result: AgentResult, language: str) -> AgentResult:
         return result  # graceful fallback — show original language
 
 
+async def translate_one_agent(agent: AgentResult, language: str) -> AgentResult:
+    """Translate a single agent result (public alias for use in SSE streaming)."""
+    return await _translate_agent(agent, language)
+
+
 async def translate_agent_results(agents: list[AgentResult], language: str) -> list[AgentResult]:
     """Translate all agent results to the target language in parallel."""
     return list(await asyncio.gather(*(_translate_agent(a, language) for a in agents)))

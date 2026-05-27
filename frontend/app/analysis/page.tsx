@@ -133,6 +133,7 @@ export default function AnalysisPage() {
         analysisJustCompletedRef.current = true;
         setIsComplete(true);
         setTimeoutWarning(false);
+        sessionStorage.removeItem("analysis_id"); // prevent re-run on page reload
         if (event.confidence_distribution) {
           setConfidenceDist(event.confidence_distribution);
         }
@@ -175,22 +176,48 @@ export default function AnalysisPage() {
     const translate = async () => {
       setIsTranslating(true);
       try {
-        const res = await fetch("/api/translate", {
+        // Step 1: store agents on backend, get a translate_id
+        const prepareRes = await fetch("/api/translate/prepare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ language: lang, agents }),
         });
-        if (!res.ok) return;
-        const data: { agents: AgentState[] } = await res.json();
-        setAgents((prev) =>
-          prev.map((a) => {
-            const translated = data.agents.find((ta) => ta.agent_id === a.agent_id);
-            if (!translated) return a;
-            return { ...a, findings: translated.findings, summary: translated.summary };
-          })
-        );
-        setAllFindings(data.agents.flatMap((a) => a.findings));
+        if (!prepareRes.ok) return;
+        const { translate_id } = await prepareRes.json() as { translate_id: string };
+
+        // Step 2: stream via GET EventSource (same pattern as analysis — works through Next.js proxy)
+        await new Promise<void>((resolve, reject) => {
+          const es = new EventSource(`/api/translate/${translate_id}/stream`);
+          es.onmessage = (e: MessageEvent<string>) => {
+            const event = JSON.parse(e.data) as {
+              type: string;
+              agent_id?: string;
+              findings?: Finding[];
+              summary?: string;
+            };
+            if (event.type === "complete") {
+              es.close();
+              resolve();
+              return;
+            }
+            if (event.type === "agent_translated" && event.agent_id) {
+              const agentId = event.agent_id;
+              const findings = event.findings ?? [];
+              const summary = event.summary ?? "";
+              setAgents((prev) =>
+                prev.map((a) => a.agent_id === agentId ? { ...a, findings, summary } : a)
+              );
+              setAllFindings((prev) => [
+                ...prev.filter((f) => f.agent_id !== agentId),
+                ...findings,
+              ]);
+            }
+          };
+          es.onerror = () => { es.close(); reject(new Error("Translation stream error")); };
+        });
         setSelectedFinding(null);
+      } catch {
+        // graceful fallback — keep current language results on error
       } finally {
         setIsTranslating(false);
       }

@@ -122,3 +122,76 @@ class TestStreamAnalysis:
 
         complete_event = next(e for e in events if e["type"] == SSEEventType.ANALYSIS_COMPLETE)
         assert complete_event["global_confidence_score"] == 0.78
+
+
+class TestTranslatePrepare:
+    """Tests for POST /api/translate/prepare."""
+
+    def test_returns_202_with_translate_id_demo(self, client: TestClient) -> None:
+        with patch("confidence_map.api.analysis.get_settings") as mock_settings:
+            mock_settings.return_value.demo_mode = True
+            response = client.post("/api/translate/prepare", json={"language": "es"})
+        assert response.status_code == 202
+        body = response.json()
+        assert "translate_id" in body
+        assert len(body["translate_id"]) > 0
+
+    def test_returns_202_with_translate_id_real_mode(self, client: TestClient) -> None:
+        agents = [_make_result().model_dump()]
+        with patch("confidence_map.api.analysis.get_settings") as mock_settings:
+            mock_settings.return_value.demo_mode = False
+            response = client.post(
+                "/api/translate/prepare",
+                json={"language": "pt", "agents": agents},
+            )
+        assert response.status_code == 202
+        assert "translate_id" in response.json()
+
+    def test_real_mode_requires_agents(self, client: TestClient) -> None:
+        with patch("confidence_map.api.analysis.get_settings") as mock_settings:
+            mock_settings.return_value.demo_mode = False
+            response = client.post("/api/translate/prepare", json={"language": "es"})
+        assert response.status_code == 400
+
+
+class TestStreamTranslateById:
+    """Tests for GET /api/translate/{translate_id}/stream."""
+
+    def test_returns_404_for_unknown_id(self, client: TestClient) -> None:
+        response = client.get("/api/translate/nonexistent-id/stream")
+        assert response.status_code == 404
+
+    def test_streams_demo_translation(self, client: TestClient) -> None:
+        """Prepare then stream in demo mode — must emit agent_translated + complete events."""
+        with patch("confidence_map.api.analysis.get_settings") as mock_settings:
+            mock_settings.return_value.demo_mode = True
+            prepare_resp = client.post("/api/translate/prepare", json={"language": "es"})
+            assert prepare_resp.status_code == 202
+            translate_id = prepare_resp.json()["translate_id"]
+
+            with client.stream("GET", f"/api/translate/{translate_id}/stream") as stream_resp:
+                assert stream_resp.status_code == 200
+                assert "text/event-stream" in stream_resp.headers["content-type"]
+                events: list[dict] = []
+                for line in stream_resp.iter_lines():
+                    if line.startswith("data: "):
+                        events.append(json.loads(line[6:]))
+
+        event_types = [e["type"] for e in events]
+        assert "agent_translated" in event_types
+        assert "complete" in event_types
+
+    def test_translate_id_consumed_after_stream(self, client: TestClient) -> None:
+        """The stored entry is deleted after streaming — prevents double-use."""
+        with patch("confidence_map.api.analysis.get_settings") as mock_settings:
+            mock_settings.return_value.demo_mode = True
+            prepare_resp = client.post("/api/translate/prepare", json={"language": "en"})
+            translate_id = prepare_resp.json()["translate_id"]
+
+            with client.stream("GET", f"/api/translate/{translate_id}/stream") as r:
+                for _ in r.iter_lines():
+                    pass
+
+        # Entry was popped — second call must 404
+        second = client.get(f"/api/translate/{translate_id}/stream")
+        assert second.status_code == 404
