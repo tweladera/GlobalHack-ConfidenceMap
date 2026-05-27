@@ -137,7 +137,7 @@ export default function ChatPanel({ findings, agents, globalScore, onClose }: Pr
 
   return (
     <div
-      className="fixed right-0 top-0 h-full w-[420px] bg-surface-card border-l border-surface-border flex flex-col shadow-2xl z-40 animate-fade-in"
+      className="flex flex-col h-full animate-fade-in"
       role="complementary"
       aria-label="Chat with AI about this analysis"
     >

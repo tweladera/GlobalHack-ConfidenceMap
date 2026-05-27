@@ -10,7 +10,7 @@ import DecisionTable from "@/components/DecisionTable";
 import HeatMap from "@/components/HeatMap";
 import BacklogModal from "@/components/BacklogModal";
 import ChatPanel from "@/components/ChatPanel";
-import { generateMarkdown, downloadMarkdown } from "@/lib/export";
+import { generateMarkdown, downloadMarkdown, exportPdf } from "@/lib/export";
 import { saveAnalysis } from "@/lib/history";
 import type { AgentState, Finding, SSEEvent } from "@/types";
 import { AGENT_DEFINITIONS } from "@/types";
@@ -50,6 +50,7 @@ export default function AnalysisPage() {
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -65,6 +66,14 @@ export default function AnalysisPage() {
     if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
     announceTimerRef.current = setTimeout(() => setAnnouncement(text), 60);
   };
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = () => setShowExportMenu(false);
+    window.addEventListener("click", handler, { capture: true, once: true });
+    return () => window.removeEventListener("click", handler, { capture: true });
+  }, [showExportMenu]);
 
   // Keyboard shortcuts: Alt+1 Map · Alt+2 Table · Alt+3 Text · Alt+4 Heat Map
   useEffect(() => {
@@ -261,6 +270,12 @@ export default function AnalysisPage() {
   const handleExport = () => {
     const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
     downloadMarkdown(content);
+    setShowExportMenu(false);
+  };
+
+  const handleExportPdf = () => {
+    exportPdf(agents, allFindings, globalScore, confidenceDist);
+    setShowExportMenu(false);
   };
 
   const activeView = textMode ? "text" : showHeatMap ? "heat" : showTable ? "table" : "map";
@@ -312,7 +327,10 @@ export default function AnalysisPage() {
             </div>
           )}
           {isComplete ? (
-            <span className="text-xs text-confidence-green font-mono">{t("analysis.complete")}</span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-confidence-green flex-shrink-0" aria-hidden="true" />
+              {t("analysis.complete")}
+            </span>
           ) : (
             <span className="text-xs text-slate-500 font-mono">
               {t("analysis.progress", { completed: completedCount, total: agents.length })}
@@ -358,13 +376,32 @@ export default function AnalysisPage() {
         {/* Action buttons: Export · Backlog · Chat */}
         {isComplete && allFindings.length > 0 && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono"
-              title="Download full analysis as Markdown"
-            >
-              Export .md
-            </button>
+            {/* Export dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono flex items-center gap-1"
+                title="Export analysis report"
+              >
+                Export <span className="opacity-60">▾</span>
+              </button>
+              {showExportMenu && (
+                <div className="absolute top-full left-0 mt-1 w-36 bg-surface-card border border-surface-border rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExport}
+                    className="w-full text-left px-3 py-2 text-xs font-mono text-slate-400 hover:text-slate-200 hover:bg-surface transition-colors"
+                  >
+                    Markdown .md
+                  </button>
+                  <button
+                    onClick={handleExportPdf}
+                    className="w-full text-left px-3 py-2 text-xs font-mono text-slate-400 hover:text-slate-200 hover:bg-surface transition-colors border-t border-surface-border"
+                  >
+                    PDF report
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowBacklog(true)}
               className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono"
@@ -648,8 +685,21 @@ export default function AnalysisPage() {
           )}
         </div>}
 
-        {/* Right sidebar — finding detail */}
-        {!textMode && <aside
+        {/* Right sidebar — chat panel OR finding detail */}
+        {!textMode && showChat && (
+          <aside
+            className="w-96 flex-shrink-0 border-l border-surface-border bg-surface-card overflow-hidden flex flex-col"
+            aria-label="AI chat panel"
+          >
+            <ChatPanel
+              findings={allFindings}
+              agents={agents}
+              globalScore={globalScore}
+              onClose={() => setShowChat(false)}
+            />
+          </aside>
+        )}
+        {!textMode && !showChat && <aside
           className="w-72 flex-shrink-0 border-l border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Finding details panel"
         >
@@ -798,14 +848,6 @@ export default function AnalysisPage() {
         <BacklogModal findings={allFindings} onClose={() => setShowBacklog(false)} />
       )}
 
-      {showChat && (
-        <ChatPanel
-          findings={allFindings}
-          agents={agents}
-          globalScore={globalScore}
-          onClose={() => setShowChat(false)}
-        />
-      )}
     </div>
   );
 }
