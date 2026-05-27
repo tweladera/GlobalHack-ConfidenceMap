@@ -36,7 +36,7 @@ export default function AccessibleSummary({ agents, findings, isComplete }: Acce
       </div>
 
       {/* Accessible summary panel — visible toggle */}
-      <div className="fixed bottom-4 right-4 z-50">
+      <div className="fixed bottom-4 left-4 z-50">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="bg-surface-card border border-surface-border rounded-full px-4 py-2 text-sm text-slate-300 hover:text-white hover:border-slate-500 transition-all shadow-lg flex items-center gap-2"
@@ -44,14 +44,14 @@ export default function AccessibleSummary({ agents, findings, isComplete }: Acce
           aria-controls="accessible-summary-panel"
           aria-label={isOpen ? "Hide text summary" : "Show text summary for screen readers"}
         >
-          <span aria-hidden="true">{isOpen ? "◀" : "◎"}</span>
+          <span aria-hidden="true">{isOpen ? "▶" : "◎"}</span>
           {isOpen ? "Hide summary" : "Text summary"}
         </button>
 
         {isOpen && (
           <div
             id="accessible-summary-panel"
-            className="absolute bottom-12 right-0 w-80 bg-surface-card border border-surface-border rounded-xl p-4 shadow-xl animate-slide-up"
+            className="absolute bottom-12 left-0 w-80 bg-surface-card border border-surface-border rounded-xl p-4 shadow-xl animate-slide-up"
             role="region"
             aria-label="Accessible text summary of confidence map"
           >
