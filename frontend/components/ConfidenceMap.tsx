@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
-  addEdge,
   Node,
   Edge,
   BackgroundVariant,
@@ -248,8 +248,13 @@ interface ConfidenceMapProps {
 export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: ConfidenceMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [mapFilter, setMapFilter] = useState<ConfidenceLevel | "all">("all");
+
+  // Lookup: findingId → confidence level (populated during buildGraph, used in filter effect)
+  const findingConfidenceRef = useRef<Map<string, ConfidenceLevel>>(new Map());
 
   const buildGraph = useCallback(() => {
+    findingConfidenceRef.current = new Map();
     const rawNodes: Node[] = [];
     const rawEdges: Edge[] = [];
 
@@ -291,6 +296,7 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
 
       // Finding nodes
       agent.findings.forEach((finding) => {
+        findingConfidenceRef.current.set(finding.id, finding.confidence);
         rawNodes.push({
           id: finding.id,
           type: "finding",
@@ -321,6 +327,39 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
     buildGraph();
   }, [buildGraph]);
 
+  // Apply confidence filter: dim non-matching finding nodes and their edges
+  useEffect(() => {
+    if (mapFilter === "all") {
+      setNodes((ns) => ns.map((n) => ({ ...n, style: { ...n.style, opacity: 1 } })));
+      setEdges((es) => es.map((e) => ({ ...e, style: { stroke: "#2d2d4e", opacity: 1 } })));
+      return;
+    }
+    setNodes((ns) =>
+      ns.map((n) => {
+        if (n.type !== "finding") return { ...n, style: { ...n.style, opacity: 1 } };
+        const matches = findingConfidenceRef.current.get(n.id) === mapFilter;
+        return { ...n, style: { opacity: matches ? 1 : 0.08 } };
+      })
+    );
+    setEdges((es) =>
+      es.map((e) => {
+        const conf = findingConfidenceRef.current.get(e.target);
+        if (conf == null) return { ...e, style: { stroke: "#2d2d4e", opacity: 1 } };
+        const matches = conf === mapFilter;
+        return { ...e, style: { stroke: matches ? "#4a4a6e" : "#2d2d4e", opacity: matches ? 1 : 0.04 } };
+      })
+    );
+  }, [mapFilter, setNodes, setEdges]);
+
+  const filterOptions: { label: string; value: ConfidenceLevel | "all"; color: string }[] = [
+    { label: "All", value: "all", color: "" },
+    { label: "Red", value: "red", color: "bg-confidence-red" },
+    { label: "Yellow", value: "yellow", color: "bg-confidence-yellow" },
+    { label: "Green", value: "green", color: "bg-confidence-green" },
+  ];
+
+  const hasFindings = findingConfidenceRef.current.size > 0;
+
   return (
     <div className="w-full h-full" role="img" aria-label="Confidence map visualization showing agents and their findings">
       <ReactFlow
@@ -350,6 +389,38 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
           }}
           maskColor="#0d0d1a80"
         />
+
+        {/* Confidence filter — shown once findings start appearing */}
+        {hasFindings && (
+          <Panel position="top-center">
+            <div
+              className="flex items-center gap-1 bg-surface-card border border-surface-border rounded-xl px-2 py-1.5 shadow-lg"
+              role="group"
+              aria-label="Filter findings by confidence level"
+            >
+              {filterOptions.map(({ label, value, color }) => {
+                const active = mapFilter === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setMapFilter(value)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all ${
+                      active
+                        ? "bg-surface text-slate-200 shadow-sm"
+                        : "text-slate-500 hover:text-slate-300"
+                    }`}
+                    aria-pressed={active}
+                  >
+                    {color && (
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${color}`} aria-hidden="true" />
+                    )}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );
