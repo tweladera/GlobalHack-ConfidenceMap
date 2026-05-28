@@ -24,23 +24,43 @@ import type { AgentState, Finding, ConfidenceLevel } from "@/types";
 function HubNode({ data }: NodeProps) {
   const score = data.globalScore as number | null | undefined;
   const hasScore = score != null;
+  const finalPct = hasScore ? Math.round(score! * 100) : 0;
+
+  const [displayPct, setDisplayPct] = useState(0);
+
+  useEffect(() => {
+    if (!hasScore) { setDisplayPct(0); return; }
+    const duration = 1400;
+    const start = performance.now();
+    let raf: number;
+    const step = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      // ease-out cubic: decelerates as it approaches the target
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayPct(Math.round(eased * finalPct));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [hasScore, finalPct]);
+
   const scoreCol = !hasScore ? "text-accent"
-    : score >= 0.7 ? "text-confidence-green"
-    : score >= 0.45 ? "text-confidence-yellow"
+    : finalPct >= 70 ? "text-confidence-green"
+    : finalPct >= 45 ? "text-confidence-yellow"
     : "text-confidence-red";
 
   return (
     <div
       className="relative flex items-center justify-center w-28 h-28 rounded-full border-2 border-accent bg-accent-dim shadow-lg shadow-accent/20"
       role="img"
-      aria-label={hasScore ? `Analysis hub: global confidence ${Math.round(score! * 100)}%` : `Analysis hub: ${data.label}`}
+      aria-label={hasScore ? `Analysis hub: global confidence ${finalPct}%` : `Analysis hub: ${data.label}`}
     >
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
       <div className="text-center px-2">
         {hasScore ? (
           <>
-            <div className={`text-xl font-bold font-mono tabular-nums leading-none ${scoreCol}`}>
-              {Math.round(score! * 100)}%
+            <div className={`text-xl font-bold font-mono tabular-nums leading-none transition-colors duration-500 ${scoreCol}`}>
+              {displayPct}%
             </div>
             <div className="text-[8px] font-mono text-slate-500 uppercase tracking-widest mt-1">confidence</div>
           </>
