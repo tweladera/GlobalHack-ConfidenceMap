@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import AgentStatusCard from "@/components/AgentStatusCard";
 import FindingDetail from "@/components/FindingDetail";
 import AccessibleSummary from "@/components/AccessibleSummary";
 import DecisionTable from "@/components/DecisionTable";
-import type { AgentState, Finding, SSEEvent } from "@/types";
+import HeatMap from "@/components/HeatMap";
+import BacklogModal from "@/components/BacklogModal";
+import ChatPanel from "@/components/ChatPanel";
+import { generateMarkdown, downloadMarkdown, exportPdf } from "@/lib/export";
+import { saveAnalysis } from "@/lib/history";
+import type { AgentState, ConsolidatorResult, Finding, SSEEvent } from "@/types";
 import { AGENT_DEFINITIONS } from "@/types";
 import { useI18n } from "@/lib/i18n";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 // React Flow must be loaded client-side only (no SSR)
 const ConfidenceMap = dynamic(() => import("@/components/ConfidenceMap"), {
@@ -31,7 +35,7 @@ const INITIAL_AGENTS: AgentState[] = AGENT_DEFINITIONS.map((a) => ({
 
 export default function AnalysisPage() {
   const router = useRouter();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [agents, setAgents] = useState<AgentState[]>(INITIAL_AGENTS);
   const [allFindings, setAllFindings] = useState<Finding[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
@@ -42,14 +46,18 @@ export default function AnalysisPage() {
   const [timeoutWarning, setTimeoutWarning] = useState(false);
   const [showTable, setShowTable] = useState(false);
   const [textMode, setTextMode] = useState(false);
+  const [showHeatMap, setShowHeatMap] = useState(false);
+  const [showBacklog, setShowBacklog] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isConsolidating, setIsConsolidating] = useState(false);
+  const [consolidationResult, setConsolidationResult] = useState<ConsolidatorResult | null>(null);
+  const [hideRedundant, setHideRedundant] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const [isTranslating, setIsTranslating] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Prevents translation from firing on the initial analysis_complete event
-  const analysisJustCompletedRef = useRef(false);
 
   const announce = (text: string) => {
     // Clear → re-set so screen readers fire a new announcement even if text is similar
@@ -58,13 +66,22 @@ export default function AnalysisPage() {
     announceTimerRef.current = setTimeout(() => setAnnouncement(text), 60);
   };
 
-  // Keyboard shortcuts: Alt+1 Map · Alt+2 Table · Alt+3 Text
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = () => setShowExportMenu(false);
+    window.addEventListener("click", handler, { capture: true, once: true });
+    return () => window.removeEventListener("click", handler, { capture: true });
+  }, [showExportMenu]);
+
+  // Keyboard shortcuts: Alt+1 Map · Alt+2 Table · Alt+3 Text · Alt+4 Heat Map
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!e.altKey) return;
-      if (e.key === "1") { e.preventDefault(); setTextMode(false); setShowTable(false); }
-      if (e.key === "2") { e.preventDefault(); setTextMode(false); setShowTable(true); }
-      if (e.key === "3") { e.preventDefault(); setTextMode(true); }
+      if (e.key === "1") { e.preventDefault(); setTextMode(false); setShowTable(false); setShowHeatMap(false); }
+      if (e.key === "2") { e.preventDefault(); setTextMode(false); setShowTable(true);  setShowHeatMap(false); }
+      if (e.key === "3") { e.preventDefault(); setTextMode(true);  setShowTable(false); setShowHeatMap(false); }
+      if (e.key === "4") { e.preventDefault(); setTextMode(false); setShowTable(false); setShowHeatMap(true); }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -128,17 +145,41 @@ export default function AnalysisPage() {
         );
       }
 
+      if (event.type === "consolidation_start") {
+        setIsConsolidating(true);
+        announce("Cross-agent audit in progress.");
+      }
+
+      if (event.type === "consolidation_complete" && event.consolidation) {
+        setIsConsolidating(false);
+        setConsolidationResult(event.consolidation);
+        announce("Cross-agent audit complete.");
+      }
+
       if (event.type === "analysis_complete") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        analysisJustCompletedRef.current = true;
         setIsComplete(true);
         setTimeoutWarning(false);
-        if (event.confidence_distribution) {
-          setConfidenceDist(event.confidence_distribution);
-        }
-        if (event.global_confidence_score != null) {
-          setGlobalScore(event.global_confidence_score);
-        }
+        sessionStorage.removeItem("analysis_id"); // prevent re-run on page reload
+        const dist = event.confidence_distribution ?? { green: 0, yellow: 0, red: 0 };
+        if (event.confidence_distribution) setConfidenceDist(dist);
+        if (event.global_confidence_score != null) setGlobalScore(event.global_confidence_score);
+        // Save to localStorage history
+        setAgents((currentAgents) => {
+          setAllFindings((currentFindings) => {
+            const specPreview = (sessionStorage.getItem("analysis_spec") ?? "").slice(0, 120);
+            saveAnalysis({
+              timestamp: Date.now(),
+              specPreview,
+              globalScore: event.global_confidence_score ?? null,
+              totalFindings: currentFindings.length,
+              confidenceDist: dist,
+              agents: currentAgents,
+            });
+            return currentFindings;
+          });
+          return currentAgents;
+        });
         es.close();
       }
 
@@ -162,87 +203,44 @@ export default function AnalysisPage() {
     };
   }, [router]);
 
-  // Translate displayed results when the user switches language after analysis is complete
-  useEffect(() => {
-    if (!isComplete) return;
-
-    // Skip the first time isComplete becomes true (results are already in the right language)
-    if (analysisJustCompletedRef.current) {
-      analysisJustCompletedRef.current = false;
-      return;
-    }
-
-    const translate = async () => {
-      setIsTranslating(true);
-      try {
-        const res = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ language: lang }),
-        });
-        if (!res.ok) return;
-        const data: { agents: AgentState[] } = await res.json();
-        setAgents((prev) =>
-          prev.map((a) => {
-            const translated = data.agents.find((ta) => ta.agent_id === a.agent_id);
-            if (!translated) return a;
-            return { ...a, findings: translated.findings, summary: translated.summary };
-          })
-        );
-        setAllFindings(data.agents.flatMap((a) => a.findings));
-        setSelectedFinding(null);
-      } finally {
-        setIsTranslating(false);
-      }
-    };
-
-    void translate();
-  }, [lang, isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const completedCount = agents.filter((a) => a.status === "completed").length;
   const progress = Math.round((completedCount / agents.length) * 100);
 
+  const redundantAgentIds = useMemo(() => {
+    if (!consolidationResult) return new Set<string>();
+    const nonKept = new Set<string>();
+    for (const r of consolidationResult.redundancies) {
+      for (const agentId of r.agents) {
+        if (agentId !== r.kept) nonKept.add(agentId);
+      }
+    }
+    return nonKept;
+  }, [consolidationResult]);
+
+  const displayedFindings = useMemo(() => {
+    if (!hideRedundant || redundantAgentIds.size === 0) return allFindings;
+    return allFindings.filter((f) => !redundantAgentIds.has(f.agent_id));
+  }, [allFindings, hideRedundant, redundantAgentIds]);
+
   const copyExecutiveSummary = async () => {
-    const reds = allFindings.filter((f) => f.confidence === "red");
-    const yellows = allFindings.filter((f) => f.confidence === "yellow");
-    const greens = allFindings.filter((f) => f.confidence === "green");
-    const score = globalScore != null ? `${Math.round(globalScore * 100)}%` : "—";
-
-    const lines = [
-      "# Confidence Map — Executive Summary",
-      "",
-      `Global confidence: ${score}`,
-      `Total: ${allFindings.length} findings (${reds.length} critical · ${yellows.length} inferred · ${greens.length} confirmed)`,
-      "",
-    ];
-
-    if (reds.length > 0) {
-      lines.push(`## Critical — High uncertainty (${reds.length})`);
-      reds.forEach((f) => {
-        lines.push(`- **${f.title}** [${f.agent_name}]`);
-        if (f.recommended_action) lines.push(`  → ${f.recommended_action}`);
-      });
-      lines.push("");
-    }
-    if (yellows.length > 0) {
-      lines.push(`## Inferred — Reasonably assumed (${yellows.length})`);
-      yellows.forEach((f) => {
-        lines.push(`- **${f.title}** [${f.agent_name}]`);
-        if (f.recommended_action) lines.push(`  → ${f.recommended_action}`);
-      });
-      lines.push("");
-    }
-    if (greens.length > 0) {
-      lines.push(`## Confirmed — Explicitly defined (${greens.length})`);
-      greens.forEach((f) => lines.push(`- ${f.title} [${f.agent_name}]`));
-    }
-
-    await navigator.clipboard.writeText(lines.join("\n"));
+    const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
+    await navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const activeView = textMode ? "text" : showTable ? "table" : "map";
+  const handleExport = () => {
+    const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
+    downloadMarkdown(content);
+    setShowExportMenu(false);
+  };
+
+  const handleExportPdf = () => {
+    exportPdf(agents, allFindings, globalScore, confidenceDist);
+    setShowExportMenu(false);
+  };
+
+  const activeView = textMode ? "text" : showHeatMap ? "heat" : showTable ? "table" : "map";
 
   return (
     <div className="flex flex-col h-screen bg-surface overflow-hidden">
@@ -291,7 +289,15 @@ export default function AnalysisPage() {
             </div>
           )}
           {isComplete ? (
-            <span className="text-xs text-confidence-green font-mono">{t("analysis.complete")}</span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-confidence-green flex-shrink-0" aria-hidden="true" />
+              {t("analysis.complete")}
+            </span>
+          ) : isConsolidating ? (
+            <span className="flex items-center gap-1.5 text-xs text-accent font-mono animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" aria-hidden="true" />
+              Cross-agent audit...
+            </span>
           ) : (
             <span className="text-xs text-slate-500 font-mono">
               {t("analysis.progress", { completed: completedCount, total: agents.length })}
@@ -299,27 +305,29 @@ export default function AnalysisPage() {
           )}
         </div>
 
-        {/* Map / Table / Text toggle */}
+        {/* Map / Table / Text / Heat toggle */}
         {allFindings.length > 0 && (
           <div
             className="flex items-center rounded-lg border border-surface-border overflow-hidden text-xs font-mono"
             role="group"
-            aria-label="View mode (Alt+1 Map, Alt+2 Table, Alt+3 Text)"
+            aria-label="View mode (Alt+1 Map, Alt+2 Table, Alt+3 Text, Alt+4 Heat Map)"
           >
-            {(["map", "table", "text"] as const).map((view, i) => {
-              const labels = {
+            {(["map", "table", "text", "heat"] as const).map((view, i) => {
+              const labels: Record<string, string> = {
                 map: t("analysis.view_map"),
                 table: t("analysis.view_table"),
                 text: t("analysis.view_text"),
+                heat: "Heat",
               };
               const active = activeView === view;
               return (
                 <button
                   key={view}
                   onClick={() => {
-                    if (view === "map")   { setTextMode(false); setShowTable(false); }
-                    if (view === "table") { setTextMode(false); setShowTable(true); }
-                    if (view === "text")  { setTextMode(true); }
+                    if (view === "map")   { setTextMode(false); setShowTable(false); setShowHeatMap(false); }
+                    if (view === "table") { setTextMode(false); setShowTable(true);  setShowHeatMap(false); }
+                    if (view === "text")  { setTextMode(true);  setShowTable(false); setShowHeatMap(false); }
+                    if (view === "heat")  { setTextMode(false); setShowTable(false); setShowHeatMap(true); }
                   }}
                   className={`px-3 py-1.5 transition-colors border-l first:border-l-0 border-surface-border ${active ? "bg-accent text-white" : "text-slate-400 hover:text-slate-200"}`}
                   aria-pressed={active}
@@ -332,7 +340,55 @@ export default function AnalysisPage() {
           </div>
         )}
 
-        <LanguageSwitcher />
+        {/* Action buttons: Export · Backlog · Chat */}
+        {isComplete && allFindings.length > 0 && (
+          <div className="flex items-center gap-2">
+            {/* Export dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono flex items-center gap-1"
+                title="Export analysis report"
+              >
+                Export <span className="opacity-60">▾</span>
+              </button>
+              {showExportMenu && (
+                <div className="absolute top-full left-0 mt-1 w-36 bg-surface-card border border-surface-border rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExport}
+                    className="w-full text-left px-3 py-2 text-xs font-mono text-slate-400 hover:text-slate-200 hover:bg-surface transition-colors"
+                  >
+                    Markdown .md
+                  </button>
+                  <button
+                    onClick={handleExportPdf}
+                    className="w-full text-left px-3 py-2 text-xs font-mono text-slate-400 hover:text-slate-200 hover:bg-surface transition-colors border-t border-surface-border"
+                  >
+                    PDF report
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowBacklog(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono"
+              title="Generate backlog tickets from findings"
+            >
+              Backlog
+            </button>
+            <button
+              onClick={() => setShowChat((v) => !v)}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors font-mono ${
+                showChat
+                  ? "bg-accent border-accent text-white"
+                  : "border-surface-border text-slate-400 hover:text-slate-200"
+              }`}
+              title="Ask AI about the findings"
+            >
+              Ask AI
+            </button>
+          </div>
+        )}
 
         {/* Global confidence score + distribution */}
         {isComplete && (
@@ -383,21 +439,7 @@ export default function AnalysisPage() {
         className="relative flex flex-1 overflow-hidden"
         aria-label="Confidence map analysis"
       >
-        {/* Translation overlay */}
-      {isTranslating && (
-        <div
-          className="absolute inset-0 z-20 flex items-center justify-center bg-surface/80 backdrop-blur-sm"
-          aria-live="polite"
-          aria-label="Translating results..."
-        >
-          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-surface-card border border-surface-border shadow-lg">
-            <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-            <span className="text-sm text-slate-300 font-mono">{t("analysis.translating")}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Left sidebar — agent status */}
+        {/* Left sidebar — agent status */}
         <aside
           className="w-64 flex-shrink-0 border-r border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Agent status panel"
@@ -571,6 +613,12 @@ export default function AnalysisPage() {
               onSelect={setSelectedFinding}
               selectedFinding={selectedFinding}
             />
+          ) : showHeatMap ? (
+            <HeatMap
+              findings={allFindings}
+              onSelect={setSelectedFinding}
+              selectedFinding={selectedFinding}
+            />
           ) : (
             <>
               {timeoutWarning && (
@@ -583,13 +631,26 @@ export default function AnalysisPage() {
                   {t("analysis.timeout")}
                 </div>
               )}
-              <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} />
+              <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} globalScore={globalScore} />
             </>
           )}
         </div>}
 
-        {/* Right sidebar — finding detail */}
-        {!textMode && <aside
+        {/* Right sidebar — chat panel OR finding detail */}
+        {!textMode && showChat && (
+          <aside
+            className="w-96 flex-shrink-0 border-l border-surface-border bg-surface-card overflow-hidden flex flex-col"
+            aria-label="AI chat panel"
+          >
+            <ChatPanel
+              findings={allFindings}
+              agents={agents}
+              globalScore={globalScore}
+              onClose={() => setShowChat(false)}
+            />
+          </aside>
+        )}
+        {!textMode && !showChat && <aside
           className="w-72 flex-shrink-0 border-l border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Finding details panel"
         >
@@ -682,7 +743,14 @@ export default function AnalysisPage() {
                   </ul>
                 </div>
               )}
+
             </section>
+          ) : isConsolidating ? (
+            <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-slate-500">
+              <div className="text-2xl animate-pulse" aria-hidden="true">◎</div>
+              <p className="text-xs font-mono text-accent animate-pulse">Cross-agent audit in progress...</p>
+              <p className="text-xs text-slate-600">Consolidating findings from all agents</p>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-slate-600">
               <div className="text-4xl" aria-hidden="true">◎</div>
@@ -690,18 +758,124 @@ export default function AnalysisPage() {
             </div>
           )}
 
+          {/* Cross-Agent Audit — above findings list */}
+          {(isConsolidating || consolidationResult) && (
+            <section
+              className="mt-6 pt-5 border-t border-surface-border"
+              aria-label="Cross-agent audit"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                  Cross-Agent Audit
+                </h2>
+                {isConsolidating && (
+                  <span className="text-[10px] text-accent font-mono animate-pulse">
+                    analyzing...
+                  </span>
+                )}
+              </div>
+
+              {consolidationResult && (
+                <div className="space-y-3">
+                  {/* Confirmed Criticals */}
+                  {consolidationResult.confirmed_criticals.length > 0 && (
+                    <div>
+                      <h3 className="text-[10px] font-semibold text-confidence-red uppercase tracking-widest mb-2">
+                        Confirmed Criticals ({consolidationResult.confirmed_criticals.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {consolidationResult.confirmed_criticals.map((c, i) => (
+                          <div
+                            key={i}
+                            className="relative rounded-lg border border-confidence-red/30 bg-confidence-red-dim pl-4 pr-2.5 py-2.5 overflow-hidden"
+                          >
+                            {/* Left accent strip */}
+                            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-confidence-red rounded-l-lg" aria-hidden="true" />
+                            <div className="flex items-start gap-1.5 mb-1">
+                              <span className="text-confidence-red text-xs flex-shrink-0 mt-px" aria-hidden="true">⚠</span>
+                              <p className="text-xs font-semibold text-slate-100 leading-snug">
+                                {c.topic}
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-slate-400 leading-relaxed pl-4">
+                              {c.combined_evidence}
+                            </p>
+                            <p className="text-[10px] text-confidence-red/70 mt-1.5 font-mono pl-4">
+                              {c.agents.join(" · ")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contradictions */}
+                  {consolidationResult.contradictions.length > 0 && (
+                    <div>
+                      <h3 className="text-[10px] font-semibold text-confidence-yellow uppercase tracking-widest mb-2">
+                        Contradictions ({consolidationResult.contradictions.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {consolidationResult.contradictions.map((c, i) => (
+                          <div
+                            key={i}
+                            className="rounded-lg border border-confidence-yellow/30 bg-confidence-yellow-dim p-2.5"
+                          >
+                            <p className="text-xs font-semibold text-slate-200 mb-1 leading-snug">
+                              {c.topic}
+                            </p>
+                            <p className="text-[10px] text-slate-400 leading-relaxed mb-1">
+                              {c.description}
+                            </p>
+                            <p className="text-[10px] text-confidence-yellow italic leading-relaxed">
+                              {c.resolution}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Audit summary */}
+                  {consolidationResult.audit_summary && (
+                    <div className="rounded-lg bg-surface border border-surface-border p-3">
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        {consolidationResult.audit_summary}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Findings list */}
           {allFindings.length > 0 && (
             <div className="mt-6">
-              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-                {t("analysis.all_findings", { count: allFindings.length })}
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                  {t("analysis.all_findings", { count: allFindings.length })}
+                </h2>
+                {redundantAgentIds.size > 0 && (
+                  <button
+                    onClick={() => setHideRedundant((v) => !v)}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                      hideRedundant
+                        ? "bg-accent/20 border-accent text-accent"
+                        : "border-surface-border text-slate-500 hover:text-slate-300"
+                    }`}
+                    title="Hide findings flagged as duplicates by the cross-agent audit"
+                  >
+                    {hideRedundant ? "Show all" : "Hide duplicates"}
+                  </button>
+                )}
+              </div>
               <ul
                 className="space-y-2"
                 role="list"
-                aria-label={`${allFindings.length} findings`}
+                aria-label={`${displayedFindings.length} findings`}
               >
-                {allFindings.map((f) => (
+                {displayedFindings.map((f) => (
                   <li key={f.id}>
                     <button
                       onClick={() => setSelectedFinding(f)}
@@ -733,6 +907,11 @@ export default function AnalysisPage() {
       </main>
 
       <AccessibleSummary agents={agents} findings={allFindings} isComplete={isComplete} />
+
+      {showBacklog && (
+        <BacklogModal findings={allFindings} onClose={() => setShowBacklog(false)} />
+      )}
+
     </div>
   );
 }

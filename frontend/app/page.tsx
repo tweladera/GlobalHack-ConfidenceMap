@@ -4,17 +4,23 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DEMO_SPEC, DEMO_ARCHITECTURE, DEMO_SPEC_AUTH, DEMO_ARCH_AUTH } from "@/lib/demo-spec";
 import { useI18n } from "@/lib/i18n";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { getHistory, clearHistory } from "@/lib/history";
+import type { AnalysisRecord } from "@/lib/history";
 
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [spec, setSpec] = useState("");
   const [architecture, setArchitecture] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<AnalysisRecord[]>([]);
   const specRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setHistory(getHistory());
+  }, []);
 
   // Auto-load preset from URL on mount: ?spec=payments | ?spec=auth
   useEffect(() => {
@@ -49,7 +55,7 @@ function HomePageContent() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec, architecture, language: lang }),
+        body: JSON.stringify({ spec, architecture }),
       });
 
       if (!res.ok) throw new Error("Failed to start analysis");
@@ -71,9 +77,6 @@ function HomePageContent() {
     >
       {/* Header */}
       <header className="text-center mb-12 animate-fade-in">
-        <div className="flex items-center justify-end mb-2 w-full max-w-3xl mx-auto">
-          <LanguageSwitcher />
-        </div>
         <div className="flex items-center justify-center gap-2 mb-4">
           <div
             className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center"
@@ -257,6 +260,63 @@ function HomePageContent() {
           ))}
         </ul>
       </section>
+      {/* History */}
+      {history.length > 0 && (
+        <section className="mt-8 w-full max-w-3xl" aria-label="Recent analyses">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-slate-500 text-sm">Recent analyses</p>
+            <button
+              onClick={() => { clearHistory(); setHistory([]); }}
+              className="text-xs text-slate-600 hover:text-slate-400 transition-colors font-mono"
+            >
+              Clear history
+            </button>
+          </div>
+          <ul className="space-y-2" role="list">
+            {history.map((record) => (
+              <li key={record.id}>
+                <button
+                  onClick={() => {
+                    sessionStorage.setItem("analysis_spec", record.specPreview);
+                    setSpec(record.specPreview);
+                    specRef.current?.focus();
+                  }}
+                  className="w-full text-left bg-surface-card border border-surface-border rounded-xl px-4 py-3 hover:border-slate-600 transition-colors group"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-xs text-slate-400 font-mono truncate flex-1 group-hover:text-slate-200 transition-colors">
+                      {record.specPreview || "—"}
+                    </p>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {record.globalScore != null && (
+                        <span
+                          className={`text-xs font-mono font-bold tabular-nums ${
+                            record.globalScore >= 0.7
+                              ? "text-confidence-green"
+                              : record.globalScore >= 0.45
+                              ? "text-confidence-yellow"
+                              : "text-confidence-red"
+                          }`}
+                        >
+                          {Math.round(record.globalScore * 100)}%
+                        </span>
+                      )}
+                      <span className="flex gap-1.5 text-[10px] font-mono">
+                        <span className="text-confidence-red">{record.confidenceDist.red}↑</span>
+                        <span className="text-confidence-yellow">{record.confidenceDist.yellow}~</span>
+                        <span className="text-confidence-green">{record.confidenceDist.green}✓</span>
+                      </span>
+                      <span className="text-[10px] text-slate-600 font-mono">
+                        {new Date(record.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

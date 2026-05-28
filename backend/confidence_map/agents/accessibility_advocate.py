@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from confidence_map.agents.base import call_agent
-from confidence_map.models.findings import AgentResult
+from confidence_map.agents.base import call_agent, format_spec_findings
+from confidence_map.models.findings import AgentResult, Finding
 
 AGENT_ID = "accessibility_advocate"
 AGENT_NAME = "Accessibility Advocate"
@@ -38,22 +38,28 @@ _USER_TEMPLATE = """Evaluate the accessibility of the following specification:
 {spec}
 </spec>
 
-{arch_block}{ctx_block}
+{arch_block}{ctx_block}{spec_findings_block}\
 Identify all accessibility barriers against WCAG 2.1 AA and inclusive design principles."""
 
 
 async def run(
-    spec: str, architecture: str = "", context: str = "", language: str = "en"
+    spec: str,
+    architecture: str = "",
+    context: str = "",
+    spec_findings: list[Finding] | None = None,
 ) -> AgentResult:
     arch_block = f"<architecture>{architecture}</architecture>\n\n" if architecture else ""
     ctx_block = f"<context>{context}</context>\n\n" if context else ""
+    spec_findings_block = format_spec_findings(spec_findings) if spec_findings else ""
     return await call_agent(
         agent_id=AGENT_ID,
         agent_name=AGENT_NAME,
         agent_icon=AGENT_ICON,
         system_prompt=_SYSTEM,
         user_prompt=_USER_TEMPLATE.format(
-            spec=spec, arch_block=arch_block, ctx_block=ctx_block
+            spec=spec,
+            arch_block=arch_block,
+            ctx_block=ctx_block,
+            spec_findings_block=spec_findings_block,
         ),
-        language=language,
     )

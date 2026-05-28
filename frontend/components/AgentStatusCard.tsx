@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { AgentState } from "@/types";
 
 const STATUS_STYLES = {
@@ -21,6 +22,8 @@ interface AgentStatusCardProps {
 }
 
 export default function AgentStatusCard({ agents }: AgentStatusCardProps) {
+  const [expandedThinking, setExpandedThinking] = useState<string | null>(null);
+
   return (
     <section aria-label="Agent analysis status" className="space-y-2">
       <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
@@ -31,6 +34,8 @@ export default function AgentStatusCard({ agents }: AgentStatusCardProps) {
           const style = STATUS_STYLES[agent.status] ?? STATUS_STYLES.pending;
           const label = STATUS_LABEL[agent.status] ?? agent.status;
           const findingCount = agent.findings.length;
+          const hasThinking = !!(agent.thinking && agent.thinking.length > 0);
+          const isExpanded = expandedThinking === agent.agent_id;
 
           return (
             <li
@@ -75,6 +80,37 @@ export default function AgentStatusCard({ agents }: AgentStatusCardProps) {
                     );
                   })}
                 </div>
+              )}
+
+              {/* Extended thinking toggle — shown when ENABLE_THINKING=true */}
+              {hasThinking && (
+                <>
+                  <button
+                    onClick={() =>
+                      setExpandedThinking(isExpanded ? null : agent.agent_id)
+                    }
+                    className="mt-2 text-[10px] text-accent/60 hover:text-accent font-mono flex items-center gap-1 transition-colors"
+                    aria-expanded={isExpanded}
+                    aria-controls={`thinking-${agent.agent_id}`}
+                  >
+                    <span aria-hidden="true">{isExpanded ? "▾" : "▸"}</span>
+                    {isExpanded ? "Hide reasoning" : "Show reasoning"}
+                  </button>
+                  {isExpanded && (
+                    <div
+                      id={`thinking-${agent.agent_id}`}
+                      role="region"
+                      aria-label={`${agent.agent_name} chain of thought`}
+                      className={
+                        "mt-2 text-[10px] text-slate-500 font-mono whitespace-pre-wrap " +
+                        "leading-relaxed max-h-52 overflow-y-auto bg-surface rounded-lg " +
+                        "p-2.5 border border-surface-border animate-fade-in"
+                      }
+                    >
+                      {agent.thinking}
+                    </div>
+                  )}
+                </>
               )}
 
               {agent.status === "error" && agent.error && (

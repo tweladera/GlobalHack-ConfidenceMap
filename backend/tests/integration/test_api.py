@@ -122,3 +122,5 @@ class TestStreamAnalysis:
 
         complete_event = next(e for e in events if e["type"] == SSEEventType.ANALYSIS_COMPLETE)
         assert complete_event["global_confidence_score"] == 0.78
+
+

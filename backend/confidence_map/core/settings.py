@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     # false = real Claude API calls (ANTHROPIC_API_KEY required)
     demo_mode: bool = False
 
+    # ── Extended thinking ─────────────────────────────────────────────────────
+    # When true, each agent call uses Claude's extended thinking feature, which
+    # shows the model's chain-of-thought before producing findings.
+    # This increases latency and cost (budget_tokens billed as output tokens).
+    # Requires demo_mode=false and a model that supports extended thinking.
+    enable_thinking: bool = False
+    thinking_budget_tokens: int = 5000  # tokens allocated for reasoning per agent
+
     # ── Anthropic ─────────────────────────────────────────────────────────────
     # Required only when demo_mode=false.
     # Get your key at: https://console.anthropic.com

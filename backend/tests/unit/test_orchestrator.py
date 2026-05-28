@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from confidence_map.models.analysis import AnalysisRequest
 from confidence_map.models.events import SSEEventType
-from confidence_map.models.findings import AgentResult, AgentStatus, ConfidenceLevel, Finding
+from confidence_map.models.findings import AgentResult, AgentStatus, ConfidenceLevel, ConsolidatorResult, Finding
 
 
 def _make_finding(score: float, confidence: str) -> Finding:
@@ -53,6 +53,9 @@ class TestGlobalConfidenceScore:
 
         mock_settings = type("S", (), {"demo_mode": False})()
 
+        mock_consolidator = MagicMock()
+        mock_consolidator.run = AsyncMock(return_value=ConsolidatorResult(audit_summary="ok"))
+
         with (
             patch("confidence_map.core.orchestrator.get_settings", return_value=mock_settings),
             patch("confidence_map.core.orchestrator.spec_analyst", mock_module),
@@ -61,6 +64,7 @@ class TestGlobalConfidenceScore:
             patch("confidence_map.core.orchestrator.business_impact", mock_module),
             patch("confidence_map.core.orchestrator.accessibility_advocate", mock_module),
             patch("confidence_map.core.orchestrator.delivery_historian", mock_module),
+            patch("confidence_map.core.orchestrator.consolidator", mock_consolidator),
         ):
             events = [e async for e in stream_analysis(request)]
 
@@ -91,6 +95,9 @@ class TestGlobalConfidenceScore:
 
         mock_settings = type("S", (), {"demo_mode": False})()
 
+        mock_consolidator = MagicMock()
+        mock_consolidator.run = AsyncMock(return_value=ConsolidatorResult(audit_summary="ok"))
+
         with (
             patch("confidence_map.core.orchestrator.get_settings", return_value=mock_settings),
             patch("confidence_map.core.orchestrator.spec_analyst", mock_module),
@@ -99,6 +106,7 @@ class TestGlobalConfidenceScore:
             patch("confidence_map.core.orchestrator.business_impact", mock_module),
             patch("confidence_map.core.orchestrator.accessibility_advocate", mock_module),
             patch("confidence_map.core.orchestrator.delivery_historian", mock_module),
+            patch("confidence_map.core.orchestrator.consolidator", mock_consolidator),
         ):
             events = [e async for e in stream_analysis(request)]
 

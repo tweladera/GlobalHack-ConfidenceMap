@@ -25,16 +25,51 @@ export interface AgentState {
   findings: Finding[];
   summary: string;
   error?: string;
+  thinking?: string;  // Extended thinking chain-of-thought (populated when ENABLE_THINKING=true)
+}
+
+export interface Contradiction {
+  topic: string;
+  agents: string[];
+  description: string;
+  resolution: string;
+}
+
+export interface ConfirmedCritical {
+  topic: string;
+  agents: string[];
+  combined_evidence: string;
+}
+
+export interface Redundancy {
+  topic: string;
+  agents: string[];
+  kept: string;
+}
+
+export interface ConsolidatorResult {
+  contradictions: Contradiction[];
+  confirmed_criticals: ConfirmedCritical[];
+  redundancies: Redundancy[];
+  audit_summary: string;
 }
 
 export interface SSEEvent {
-  type: "agent_start" | "agent_complete" | "agent_error" | "analysis_complete" | "error";
+  type:
+    | "agent_start"
+    | "agent_complete"
+    | "agent_error"
+    | "analysis_complete"
+    | "consolidation_start"
+    | "consolidation_complete"
+    | "error";
   agent_id?: string;
   agent_name?: string;
   result?: AgentState;
   total_findings?: number;
   confidence_distribution?: { green: number; yellow: number; red: number };
   global_confidence_score?: number;
+  consolidation?: ConsolidatorResult;
   error?: string;
 }
 

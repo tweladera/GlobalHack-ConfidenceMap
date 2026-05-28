@@ -22,18 +22,34 @@ import type { AgentState, Finding, ConfidenceLevel } from "@/types";
 // ── Node types ────────────────────────────────────────────────────────────────
 
 function HubNode({ data }: NodeProps) {
+  const score = data.globalScore as number | null | undefined;
+  const hasScore = score != null;
+  const scoreCol = !hasScore ? "text-accent"
+    : score >= 0.7 ? "text-confidence-green"
+    : score >= 0.45 ? "text-confidence-yellow"
+    : "text-confidence-red";
+
   return (
     <div
-      className="relative flex items-center justify-center w-24 h-24 rounded-full border-2 border-accent bg-accent-dim"
+      className="relative flex items-center justify-center w-28 h-28 rounded-full border-2 border-accent bg-accent-dim shadow-lg shadow-accent/20"
       role="img"
-      aria-label={`Analysis hub: ${data.label}`}
+      aria-label={hasScore ? `Analysis hub: global confidence ${Math.round(score! * 100)}%` : `Analysis hub: ${data.label}`}
     >
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
-      <div className="text-center">
-        <div className="text-2xl" aria-hidden="true">
-          ◎
-        </div>
-        <div className="text-[10px] font-mono text-accent mt-1">{data.label}</div>
+      <div className="text-center px-2">
+        {hasScore ? (
+          <>
+            <div className={`text-xl font-bold font-mono tabular-nums leading-none ${scoreCol}`}>
+              {Math.round(score! * 100)}%
+            </div>
+            <div className="text-[8px] font-mono text-slate-500 uppercase tracking-widest mt-1">confidence</div>
+          </>
+        ) : (
+          <>
+            <div className="text-3xl animate-pulse" aria-hidden="true">◎</div>
+            <div className="text-[9px] font-mono text-accent mt-1 uppercase tracking-wide">{data.label}</div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -57,6 +73,10 @@ function AgentNode({ data }: NodeProps) {
   const colorClass = STATUS_COLORS[data.status as keyof typeof STATUS_COLORS] ?? STATUS_COLORS.pending;
   const badgeClass = STATUS_BADGE[data.status as keyof typeof STATUS_BADGE] ?? STATUS_BADGE.pending;
   const isRunning = data.status === "running";
+  const total = (data.greenCount as number) + (data.yellowCount as number) + (data.redCount as number);
+  const greenPct = total > 0 ? ((data.greenCount as number) / total) * 100 : 0;
+  const yellowPct = total > 0 ? ((data.yellowCount as number) / total) * 100 : 0;
+  const redPct = total > 0 ? ((data.redCount as number) / total) * 100 : 0;
 
   return (
     <div
@@ -67,30 +87,48 @@ function AgentNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Top} className="opacity-0" />
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
 
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold truncate">{data.label}</span>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono uppercase ${badgeClass}`}>
-          {data.status === "running" ? "..." : data.status}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold truncate leading-tight">{data.label}</span>
+        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono uppercase flex-shrink-0 ml-1 ${badgeClass}`}>
+          {data.status === "running" ? "···" : data.status}
         </span>
       </div>
 
       {data.findingCount > 0 && (
-        <div className="flex gap-1 mt-2" aria-label={`Findings: ${data.greenCount} confirmed, ${data.yellowCount} inferred, ${data.redCount} high uncertainty`}>
-          {data.greenCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-confidence-green-dim text-confidence-green font-mono">
-              {data.greenCount} ✓
-            </span>
-          )}
-          {data.yellowCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-confidence-yellow-dim text-confidence-yellow font-mono">
-              {data.yellowCount} ~
-            </span>
-          )}
-          {data.redCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-confidence-red-dim text-confidence-red font-mono">
-              {data.redCount} !
-            </span>
-          )}
+        <div
+          className="space-y-1.5"
+          aria-label={`${data.greenCount} confirmed, ${data.yellowCount} inferred, ${data.redCount} high uncertainty`}
+        >
+          {/* Stacked severity bar */}
+          <div className="flex h-2 rounded-full overflow-hidden gap-px bg-surface-border">
+            {data.greenCount > 0 && (
+              <div className="bg-confidence-green transition-all duration-700" style={{ width: `${greenPct}%` }} />
+            )}
+            {data.yellowCount > 0 && (
+              <div className="bg-confidence-yellow transition-all duration-700" style={{ width: `${yellowPct}%` }} />
+            )}
+            {data.redCount > 0 && (
+              <div className="bg-confidence-red transition-all duration-700" style={{ width: `${redPct}%` }} />
+            )}
+          </div>
+          {/* Count badges */}
+          <div className="flex gap-1">
+            {data.greenCount > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-confidence-green-dim text-confidence-green font-mono">
+                {data.greenCount}✓
+              </span>
+            )}
+            {data.yellowCount > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-confidence-yellow-dim text-confidence-yellow font-mono">
+                {data.yellowCount}~
+              </span>
+            )}
+            {data.redCount > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-confidence-red-dim text-confidence-red font-mono">
+                {data.redCount}!
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -116,41 +154,42 @@ const CONFIDENCE_DOT: Record<ConfidenceLevel, string> = {
 };
 
 function FindingNode({ data }: NodeProps) {
-  const borderClass = CONFIDENCE_BORDER[data.confidence as ConfidenceLevel] ?? "border-surface-border";
-  const textClass = CONFIDENCE_TEXT[data.confidence as ConfidenceLevel] ?? "text-slate-400";
-  const dotClass = CONFIDENCE_DOT[data.confidence as ConfidenceLevel] ?? "bg-slate-400";
+  const confidence = data.confidence as ConfidenceLevel;
+  const borderClass = CONFIDENCE_BORDER[confidence] ?? "border-surface-border";
+  const textClass = CONFIDENCE_TEXT[confidence] ?? "text-slate-400";
   const score = Math.round((data.confidence_score as number) * 100);
+  const isRed = confidence === "red";
+  const accentW = isRed ? "w-1.5" : "w-1";
+  const accentBg = `bg-confidence-${confidence}`;
+  const borderWeight = isRed ? "border-2" : "border";
 
   return (
     <button
       onClick={data.onClick}
-      className={`w-52 bg-surface-card border rounded-xl p-3 text-left cursor-pointer hover:brightness-125 transition-all animate-fade-in ${borderClass}`}
-      aria-label={`Finding: ${data.label}. Confidence: ${data.confidence}, ${score}%. Click to view details.`}
+      className={`relative w-52 bg-surface-card ${borderWeight} rounded-xl pl-4 pr-3 py-3 text-left cursor-pointer hover:brightness-125 transition-all animate-fade-in overflow-hidden ${borderClass}`}
+      aria-label={`Finding: ${data.label}. Confidence: ${confidence}, ${score}%. Click to view details.`}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
 
-      <div className="flex items-start gap-2">
-        <span
-          className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`}
-          aria-hidden="true"
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-slate-200 leading-snug">{data.label}</p>
-          <p className={`text-[10px] mt-1 font-mono uppercase ${textClass}`}>
-            {data.confidence}
-          </p>
-          <div className="mt-2 flex items-center gap-1.5">
+      {/* Left severity accent strip */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 ${accentW} ${accentBg}`}
+        aria-hidden="true"
+      />
+
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-slate-200 leading-snug line-clamp-2">{data.label}</p>
+        <div className="mt-2 flex items-center gap-1.5">
+          <div
+            className="flex-1 h-1.5 bg-surface-border rounded-full overflow-hidden"
+            aria-hidden="true"
+          >
             <div
-              className="flex-1 h-1 bg-surface-border rounded-full overflow-hidden"
-              aria-hidden="true"
-            >
-              <div
-                className={`h-full rounded-full bg-confidence-${data.confidence as string} transition-all duration-700`}
-                style={{ width: `${score}%` }}
-              />
-            </div>
-            <span className={`text-[9px] font-mono tabular-nums ${textClass}`}>{score}%</span>
+              className={`h-full rounded-full bg-confidence-${confidence} transition-all duration-700`}
+              style={{ width: `${score}%` }}
+            />
           </div>
+          <span className={`text-xs font-bold font-mono tabular-nums ${textClass}`}>{score}%</span>
         </div>
       </div>
     </button>
@@ -173,8 +212,8 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
 
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, {
-      width: node.id === "hub" ? 96 : node.type === "agent" ? 176 : 208,
-      height: node.id === "hub" ? 96 : node.type === "agent" ? 80 : 72,
+      width: node.id === "hub" ? 112 : node.type === "agent" ? 176 : 208,
+      height: node.id === "hub" ? 112 : node.type === "agent" ? 90 : 72,
     });
   });
 
@@ -189,8 +228,8 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
     return {
       ...node,
       position: {
-        x: pos.x - (node.id === "hub" ? 48 : node.type === "agent" ? 88 : 104),
-        y: pos.y - (node.id === "hub" ? 48 : node.type === "agent" ? 40 : 36),
+        x: pos.x - (node.id === "hub" ? 56 : node.type === "agent" ? 88 : 104),
+        y: pos.y - (node.id === "hub" ? 56 : node.type === "agent" ? 45 : 36),
       },
     };
   });
@@ -203,9 +242,10 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
 interface ConfidenceMapProps {
   agents: AgentState[];
   onFindingSelect: (finding: Finding) => void;
+  globalScore?: number | null;
 }
 
-export default function ConfidenceMap({ agents, onFindingSelect }: ConfidenceMapProps) {
+export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: ConfidenceMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
@@ -218,7 +258,7 @@ export default function ConfidenceMap({ agents, onFindingSelect }: ConfidenceMap
       id: "hub",
       type: "hub",
       position: { x: 0, y: 0 },
-      data: { label: "ANALYSIS" },
+      data: { label: "ANALYSIS", globalScore: globalScore ?? null },
     });
 
     // Agent nodes
@@ -275,7 +315,7 @@ export default function ConfidenceMap({ agents, onFindingSelect }: ConfidenceMap
     const { nodes: ln, edges: le } = getLayoutedElements(rawNodes, rawEdges);
     setNodes(ln);
     setEdges(le);
-  }, [agents, onFindingSelect, setNodes, setEdges]);
+  }, [agents, globalScore, onFindingSelect, setNodes, setEdges]);
 
   useEffect(() => {
     buildGraph();
