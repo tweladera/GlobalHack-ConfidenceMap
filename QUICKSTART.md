@@ -1,12 +1,10 @@
 # Quick Start Guide — Confidence Map
 
-This guide takes the project from zero to running in under 10 minutes.
+From zero to running in under 10 minutes.
 
 ---
 
 ## Prerequisites
-
-Install these tools before starting:
 
 | Tool | Minimum version | Verify |
 |------|----------------|--------|
@@ -15,43 +13,30 @@ Install these tools before starting:
 | Node.js | 20+ | `node --version` |
 | pnpm | 8+ | `pnpm --version` |
 
-### Install uv (if not present)
 ```bash
+# Install uv (if missing)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
-### Install pnpm (if not present)
-```bash
+# Install pnpm (if missing)
 npm install -g pnpm
 ```
 
 ---
 
-## Recommended: Makefile (one command)
+## Option A — Makefile (recommended)
 
 ```bash
-make setup    # First time: verify tools, create .env, install dependencies
-make demo     # Start backend + frontend in DEMO_MODE (no API key needed)
+make setup    # Verify tools, create backend/.env, install all deps
+make demo     # Start backend (:8000) + frontend (:3000) in demo mode
 ```
 
-Open `http://localhost:3000`, select a preset, and click **Run Analysis**.
+Open `http://localhost:3000`, select a preset, click **Run Analysis**.
 
 ---
 
-## Manual Setup
+## Option B — Manual setup
 
-### Step 1 — Get an Anthropic API key
-
-1. Go to [console.anthropic.com](https://console.anthropic.com)
-2. Create an account or sign in
-3. Go to **API Keys** → **Create Key**
-4. Copy the key (starts with `sk-ant-...`)
-
-> **Note:** The **demo mode** (`DEMO_MODE=true`) does not use any credits — it uses pre-generated results. An API key is only needed for real analysis.
-
----
-
-### Step 2 — Configure the backend
+### 1. Configure the backend
 
 ```bash
 cd backend
@@ -61,189 +46,196 @@ cp .env.example .env
 Edit `backend/.env`:
 
 ```env
-# Demo mode: true = no API key ($0 cost), false = real Claude API
+# Demo mode: no API key needed, pre-generated results, $0 cost
 DEMO_MODE=true
 
-# Only required when DEMO_MODE=false
-ANTHROPIC_API_KEY=sk-ant-api03-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# Only needed when DEMO_MODE=false
+ANTHROPIC_API_KEY=sk-ant-api03-XXXXXXXX
 
-# Model to use (switch to haiku to reduce costs)
+# Model (haiku = faster/cheaper for dev, sonnet = quality for demo)
 MODEL=claude-sonnet-4-6
 
-# Frontend URL (for CORS)
+# Extended thinking (optional — adds ~$0.45/analysis on Sonnet)
+ENABLE_THINKING=false
+THINKING_BUDGET_TOKENS=5000
+
 FRONTEND_URL=http://localhost:3000
 ```
 
-Install dependencies:
-
 ```bash
 uv sync
-```
-
-Verify:
-
-```bash
 ANTHROPIC_API_KEY=test uv run pytest --no-header -q
-# Expected: 42 passed, coverage ≥80%
-```
+# → 81 passed, coverage 87.94%
 
-Start the server:
-
-```bash
 uv run uvicorn confidence_map.main:app --reload
+# → http://localhost:8000/health
 ```
 
-Health check: `http://localhost:8000/health` → `{"status":"ok","version":"0.1.0"}`
-
----
-
-### Step 3 — Configure the frontend
-
-Open a new terminal:
+### 2. Start the frontend
 
 ```bash
 cd frontend
 pnpm install --registry https://registry.npmjs.org
 pnpm dev
+# → http://localhost:3000
 ```
-
-> The `--registry` flag is required if your system has a private registry configured (Artifactory, Nexus, etc.).
-
-Open `http://localhost:3000`.
 
 ---
 
-### Step 4 — Run the demo
+## Running an Analysis
 
 1. Open `http://localhost:3000`
-2. Click **"NovaBank · Payments"** or **"NovaBank · Auth MFA"** to load a demo spec
-3. Click **"Run Analysis"**
-4. Watch the 6 agents activate in real time on the map
+2. Click **"NovaBank · Payments"** or **"NovaBank · Auth MFA"** to load a preset
+   - Or paste your own spec (PRD) and architecture document
+3. Click **Run Analysis**
 
-With `DEMO_MODE=true`: completes in approximately **5 seconds**.
-With real API: takes **60–120 seconds** (6 agents × ~20s with parallelism).
+### What happens
+
+**Phase 1** — Spec Analyst runs first and shares its findings with the other agents.
+
+**Phase 2** — Five agents run in parallel (max 3 concurrent API calls):
+- Architecture Validator
+- Risk Intelligence
+- Business Impact
+- Accessibility Advocate
+- Delivery Historian
+
+**Phase 3** — Consolidator cross-audits all findings:
+- **Confirmed Criticals**: risks flagged RED by ≥2 independent agents
+- **Contradictions**: findings where agents disagree
+- **Redundancies**: duplicate findings (one canonical version kept)
+
+### Timing
+
+| Mode | Duration | Cost |
+|------|----------|------|
+| `DEMO_MODE=true` | ~5 seconds | $0 |
+| Real · Haiku | ~60–90 seconds | ~$0.003 |
+| Real · Sonnet | ~4–6 minutes | ~$0.05–0.10 |
+| Real · Sonnet + Thinking | ~8–12 minutes | ~$0.50–0.55 |
+
+---
+
+## Navigating the Results
+
+### Views (keyboard shortcuts)
+- **Alt+1** — Confidence Map (React Flow graph)
+- **Alt+2** — Decision Table (filterable)
+- **Alt+3** — Text Mode (copy executive summary)
+- **Alt+4** — Risk Heat Map (5×5 Likelihood × Impact)
+
+### Confidence Map
+- **Hub node** — shows global confidence % once analysis completes
+- **Agent nodes** — stacked colored bar shows severity distribution (green/yellow/red)
+- **Finding nodes** — left accent strip indicates severity; click to open detail panel
+- **Cross-Agent Audit** (right sidebar) — Confirmed Criticals with ⚠ marker appear first
+
+### Finding Detail
+- **Evidence** — exact quote from spec/architecture, border color matches confidence level
+- **Assumptions** — what the agent assumed when the spec was silent
+- **Needs validation** — open questions that block implementation
+- **→ What to do** — highlighted recommended action
+
+### Post-analysis tools (header buttons)
+- **Export ▾** — Download Markdown `.md` or open styled PDF report
+- **Backlog** — Generate JIRA-ready tickets from red/yellow findings
+- **Ask AI** — Inline chat panel with full analysis context
+
+### Sidebar features
+- **Findings list** — all findings scrollable; "Hide duplicates" toggle appears when the
+  consolidator identified redundant findings
+- **Show reasoning** — per-agent toggle if `ENABLE_THINKING=true` in backend
+
+---
+
+## Demo Presets
+
+| Preset | URL param | Spec |
+|--------|-----------|------|
+| NovaBank · Payments | `?spec=payments` | International instant payments — legacy SWIFT gateway |
+| NovaBank · Auth MFA | `?spec=auth` | Multi-factor authentication — regulatory deadline |
+
+Both presets are split into two separate inputs:
+- **Spec** — pure PRD (business context, user stories, NFRs, compliance)
+- **Architecture** — technical document (system design, constraints, infrastructure)
+
+---
+
+## Eval Framework
+
+Evaluates agents against golden specs with recall-based scoring:
+
+```bash
+make eval                    # run all golden specs (requires real API key)
+cd backend && uv run python -m evals --spec simplebank   # single spec
+```
+
+Specs: `SIMPLEBANK` (4 criteria, 3 agents) · `MEDIPAY` (4 criteria, 3 agents).
+Minimum recall threshold: 0.60.
 
 ---
 
 ## Environment Variables Reference
 
-### Backend (`backend/.env`)
+### `backend/.env`
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DEMO_MODE` | No | `false` | `true` = pre-generated results, no API |
-| `ANTHROPIC_API_KEY` | Only if `DEMO_MODE=false` | — | Anthropic API key |
-| `MODEL` | No | `claude-sonnet-4-6` | Claude model to use |
-| `FRONTEND_URL` | No | `http://localhost:3000` | Allowed CORS origin |
+| `DEMO_MODE` | No | `false` | `true` = pre-generated results |
+| `ANTHROPIC_API_KEY` | When not demo | — | Anthropic API key |
+| `MODEL` | No | `claude-sonnet-4-6` | Claude model |
+| `ENABLE_THINKING` | No | `false` | Per-agent extended chain-of-thought |
+| `THINKING_BUDGET_TOKENS` | No | `5000` | Token budget per agent for thinking |
+| `FRONTEND_URL` | No | `http://localhost:3000` | CORS allowed origin |
 
-### Available models
+### Model options
 
-| Model | Speed | Relative cost | Recommended for |
-|-------|-------|---------------|-----------------|
-| `claude-haiku-4-5-20251001` | Fast | Low (~1x) | Development and testing |
-| `claude-sonnet-4-6` | Medium | Medium (~5x) | Demo and production |
-
-### Frontend
-
-No environment variables required for local development. The `next.config.ts` proxy redirects `/api/*` → `localhost:8000` automatically.
+| Model | Speed | Cost (per full analysis) | Use for |
+|-------|-------|--------------------------|---------|
+| `claude-haiku-4-5-20251001` | Fast | ~$0.003 | Development |
+| `claude-sonnet-4-6` | Medium | ~$0.05–0.10 | Demo / production |
 
 ---
 
-## Reducing API Key Usage
-
-### Option 1: Demo mode with pre-generated results (recommended)
-```env
-DEMO_MODE=true
-```
-The analysis uses realistic pre-generated results — $0 cost.
-
-### Option 2: Use Haiku in `.env`
-```env
-DEMO_MODE=false
-MODEL=claude-haiku-4-5-20251001
-```
-
-### Option 3: Mock the API in tests
-Tests use mocks and never call the real API:
-```bash
-ANTHROPIC_API_KEY=test uv run pytest
-```
-
----
-
-## Verify Everything Works
+## Makefile Reference
 
 ```bash
-# Terminal 1: backend
-cd backend && uv run uvicorn confidence_map.main:app --reload
-
-# Terminal 2: frontend
-cd frontend && pnpm dev
-
-# Terminal 3: verify health
-curl http://localhost:8000/health
-# → {"status":"ok","version":"0.1.0"}
+make setup    # First-time setup
+make demo     # DEMO_MODE=true — no API key needed
+make dev      # Real mode — needs API key in backend/.env
+make stop     # Kill :8000 and :3000
+make check    # All quality gates: ruff + mypy + tsc + pytest
+make test     # pytest only
+make eval     # Golden spec evaluations (real API key required)
+make health   # curl /health
 ```
-
-Open `http://localhost:3000`, load a preset, run the analysis.
 
 ---
 
 ## Troubleshooting
 
-### Error: `ANTHROPIC_API_KEY` not configured
-```
-pydantic_settings.main.SettingsError: field required
-```
-Solution: create `backend/.env` with `DEMO_MODE=true` (or add the key).
+### `pydantic_settings.main.SettingsError: field required`
+Create `backend/.env` (copy from `.env.example`) and set `DEMO_MODE=true`.
 
-### Error: `Connection refused` when running analysis
-The backend is not running. Execute:
+### `Connection refused` when running analysis
+Backend is not running:
 ```bash
 cd backend && uv run uvicorn confidence_map.main:app --reload
 ```
 
-### Error: `pnpm install` fails with 401
-Private registry detected. Use:
+### `pnpm install` fails with 401
+Private registry active. Override:
 ```bash
 pnpm install --registry https://registry.npmjs.org
 ```
 
-### Analysis takes too long
-Switch to demo mode in `backend/.env`:
+### Analysis never completes (real mode)
+Check that your `ANTHROPIC_API_KEY` has credits. Switch to demo mode:
 ```env
 DEMO_MODE=true
 ```
-Or use Haiku:
-```env
-MODEL=claude-haiku-4-5-20251001
-```
 
-### Tests fail with import error
+### Tests fail with import errors
 ```bash
 cd backend && uv sync
-```
-
----
-
-## Quick Reference
-
-```bash
-# Install everything
-make setup
-
-# Start (demo mode, no API key)
-make demo
-
-# Start (real mode, needs API key in backend/.env)
-make dev
-
-# Quality gates
-make check
-
-# Tests only
-make test
-
-# Stop all services
-make stop
 ```
