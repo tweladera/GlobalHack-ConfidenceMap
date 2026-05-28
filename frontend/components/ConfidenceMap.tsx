@@ -73,6 +73,8 @@ function AgentNode({ data }: NodeProps) {
   const colorClass = STATUS_COLORS[data.status as keyof typeof STATUS_COLORS] ?? STATUS_COLORS.pending;
   const badgeClass = STATUS_BADGE[data.status as keyof typeof STATUS_BADGE] ?? STATUS_BADGE.pending;
   const isRunning = data.status === "running";
+  const isFocused = data.isFocused as boolean | undefined;
+  const isClickable = (data.findingCount as number) > 0;
   const total = (data.greenCount as number) + (data.yellowCount as number) + (data.redCount as number);
   const greenPct = total > 0 ? ((data.greenCount as number) / total) * 100 : 0;
   const yellowPct = total > 0 ? ((data.yellowCount as number) / total) * 100 : 0;
@@ -80,9 +82,17 @@ function AgentNode({ data }: NodeProps) {
 
   return (
     <div
-      className={`relative w-44 bg-surface-card border-2 rounded-xl p-3 transition-all ${colorClass} ${isRunning ? "agent-glow" : ""}`}
-      role="region"
-      aria-label={`Agent: ${data.label}, status: ${data.status}, ${data.findingCount} findings`}
+      onClick={isClickable ? (data.onClick as () => void) : undefined}
+      className={[
+        "relative w-44 bg-surface-card border-2 rounded-xl p-3 transition-all",
+        colorClass,
+        isRunning ? "agent-glow" : "",
+        isClickable ? "cursor-pointer" : "",
+        isFocused ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : "",
+      ].join(" ")}
+      role={isClickable ? "button" : "region"}
+      aria-pressed={isClickable ? isFocused : undefined}
+      aria-label={`${data.label}: ${data.status}, ${data.findingCount} findings${isClickable ? ". Click to focus" : ""}`}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
@@ -249,12 +259,16 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [mapFilter, setMapFilter] = useState<ConfidenceLevel | "all">("all");
+  const [focusedAgent, setFocusedAgent] = useState<string | null>(null);
 
-  // Lookup: findingId → confidence level (populated during buildGraph, used in filter effect)
+  // findingId → confidence (for filter effect)
   const findingConfidenceRef = useRef<Map<string, ConfidenceLevel>>(new Map());
+  // agentId → Set<findingId> (for focus effect)
+  const agentFindingsRef = useRef<Map<string, Set<string>>>(new Map());
 
   const buildGraph = useCallback(() => {
     findingConfidenceRef.current = new Map();
+    agentFindingsRef.current = new Map();
     const rawNodes: Node[] = [];
     const rawEdges: Edge[] = [];
 
@@ -271,6 +285,8 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
       const greenCount = agent.findings.filter((f) => f.confidence === "green").length;
       const yellowCount = agent.findings.filter((f) => f.confidence === "yellow").length;
       const redCount = agent.findings.filter((f) => f.confidence === "red").length;
+      const findingIds = new Set(agent.findings.map((f) => f.id));
+      agentFindingsRef.current.set(agent.agent_id, findingIds);
 
       rawNodes.push({
         id: agent.agent_id,
@@ -283,6 +299,8 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
           greenCount,
           yellowCount,
           redCount,
+          isFocused: false,
+          onClick: () => setFocusedAgent((prev) => (prev === agent.agent_id ? null : agent.agent_id)),
         },
       });
 
@@ -351,6 +369,53 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
     );
   }, [mapFilter, setNodes, setEdges]);
 
+  // Agent focus mode: dim everything except the focused agent and its findings
+  useEffect(() => {
+    if (focusedAgent === null) {
+      // Clear focus — restore nodes to full opacity and remove isFocused flag
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.type === "agent"
+            ? { ...n, style: { opacity: 1 }, data: { ...n.data, isFocused: false } }
+            : { ...n, style: { opacity: 1 } }
+        )
+      );
+      setEdges((es) => es.map((e) => ({ ...e, style: { stroke: "#2d2d4e", opacity: 1 } })));
+      return;
+    }
+
+    const focusedFindingIds = agentFindingsRef.current.get(focusedAgent) ?? new Set<string>();
+
+    setNodes((ns) =>
+      ns.map((n) => {
+        if (n.id === "hub") return { ...n, style: { opacity: 1 } };
+        if (n.type === "agent") {
+          const isFocused = n.id === focusedAgent;
+          return {
+            ...n,
+            style: { opacity: isFocused ? 1 : 0.2 },
+            data: { ...n.data, isFocused },
+          };
+        }
+        // finding node
+        const inFocus = focusedFindingIds.has(n.id);
+        return { ...n, style: { opacity: inFocus ? 1 : 0.05 } };
+      })
+    );
+    setEdges((es) =>
+      es.map((e) => {
+        const isAgentEdge = e.id.startsWith("hub-");
+        if (isAgentEdge) {
+          const active = e.target === focusedAgent;
+          return { ...e, style: { stroke: active ? "#6366f1" : "#2d2d4e", opacity: active ? 1 : 0.1 } };
+        }
+        // agent → finding edge
+        const inFocus = focusedFindingIds.has(e.target);
+        return { ...e, style: { stroke: inFocus ? "#4a4a6e" : "#2d2d4e", opacity: inFocus ? 1 : 0.04 } };
+      })
+    );
+  }, [focusedAgent, setNodes, setEdges]);
+
   const filterOptions: { label: string; value: ConfidenceLevel | "all"; color: string }[] = [
     { label: "All", value: "all", color: "" },
     { label: "Red", value: "red", color: "bg-confidence-red" },
@@ -390,35 +455,52 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
           maskColor="#0d0d1a80"
         />
 
-        {/* Confidence filter — shown once findings start appearing */}
+        {/* Top-center panel: confidence filter OR focus mode label */}
         {hasFindings && (
           <Panel position="top-center">
-            <div
-              className="flex items-center gap-1 bg-surface-card border border-surface-border rounded-xl px-2 py-1.5 shadow-lg"
-              role="group"
-              aria-label="Filter findings by confidence level"
-            >
-              {filterOptions.map(({ label, value, color }) => {
-                const active = mapFilter === value;
-                return (
-                  <button
-                    key={value}
-                    onClick={() => setMapFilter(value)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all ${
-                      active
-                        ? "bg-surface text-slate-200 shadow-sm"
-                        : "text-slate-500 hover:text-slate-300"
-                    }`}
-                    aria-pressed={active}
-                  >
-                    {color && (
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${color}`} aria-hidden="true" />
-                    )}
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            {focusedAgent ? (
+              /* Focus mode indicator */
+              <div className="flex items-center gap-2 bg-surface-card border border-accent/40 rounded-xl px-3 py-1.5 shadow-lg">
+                <span className="text-[11px] font-mono text-accent">
+                  Focus: {agents.find((a) => a.agent_id === focusedAgent)?.agent_name}
+                </span>
+                <button
+                  onClick={() => setFocusedAgent(null)}
+                  className="text-[11px] font-mono text-slate-500 hover:text-slate-200 transition-colors ml-1"
+                  aria-label="Exit focus mode"
+                >
+                  × exit
+                </button>
+              </div>
+            ) : (
+              /* Confidence filter */
+              <div
+                className="flex items-center gap-1 bg-surface-card border border-surface-border rounded-xl px-2 py-1.5 shadow-lg"
+                role="group"
+                aria-label="Filter findings by confidence level"
+              >
+                {filterOptions.map(({ label, value, color }) => {
+                  const active = mapFilter === value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setMapFilter(value)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all ${
+                        active
+                          ? "bg-surface text-slate-200 shadow-sm"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                      aria-pressed={active}
+                    >
+                      {color && (
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${color}`} aria-hidden="true" />
+                      )}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </Panel>
         )}
       </ReactFlow>
