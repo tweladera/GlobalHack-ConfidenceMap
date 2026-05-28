@@ -63,19 +63,19 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
       </div>
 
       {/* Body */}
-      <div className="px-4 py-3 space-y-3 text-sm max-h-80 overflow-y-auto">
+      <div className="px-4 py-3 space-y-4 text-sm max-h-80 overflow-y-auto">
         {/* Description */}
-        <div>
-          <p className="text-slate-300 leading-relaxed">{finding.description}</p>
-        </div>
+        <p className="text-slate-300 leading-relaxed text-xs">{finding.description}</p>
 
         {/* Evidence */}
         {finding.evidence && (
           <div>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+            <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">
               {t("finding.evidence")}
             </h4>
-            <blockquote className="border-l-2 border-surface-border pl-3 text-slate-400 italic text-xs leading-relaxed">
+            <blockquote
+              className={`border-l-2 pl-3 text-slate-400 italic text-xs leading-relaxed bg-surface rounded-r-lg py-1.5 border-confidence-${finding.confidence}`}
+            >
               {finding.evidence}
             </blockquote>
           </div>
@@ -84,13 +84,13 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
         {/* Assumptions */}
         {finding.assumptions.length > 0 && (
           <div>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+            <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">
               {t("finding.assumptions")}
             </h4>
             <ul className="space-y-1" aria-label="Assumptions made">
               {finding.assumptions.map((a, i) => (
                 <li key={i} className="text-xs text-slate-400 flex items-start gap-2">
-                  <span className="text-confidence-yellow mt-0.5" aria-hidden="true">~</span>
+                  <span className="text-confidence-yellow flex-shrink-0 mt-0.5 font-bold" aria-hidden="true">~</span>
                   {a}
                 </li>
               ))}
@@ -101,13 +101,13 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
         {/* Needs validation */}
         {finding.needs_validation.length > 0 && (
           <div>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+            <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">
               {t("finding.needs_validation")}
             </h4>
             <ul className="space-y-1" aria-label="Items needing validation">
               {finding.needs_validation.map((v, i) => (
                 <li key={i} className="text-xs text-slate-400 flex items-start gap-2">
-                  <span className="text-confidence-red mt-0.5" aria-hidden="true">?</span>
+                  <span className="text-confidence-red flex-shrink-0 mt-0.5 font-bold" aria-hidden="true">?</span>
                   {v}
                 </li>
               ))}
@@ -115,13 +115,13 @@ export default function FindingDetail({ finding, onClose }: FindingDetailProps) 
           </div>
         )}
 
-        {/* Recommended action */}
+        {/* Recommended action — highlighted call-to-action */}
         {finding.recommended_action && (
-          <div>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              {t("finding.what_to_do")}
+          <div className="rounded-lg bg-accent-dim border border-accent/40 px-3 py-2.5">
+            <h4 className="text-[10px] font-semibold text-accent uppercase tracking-widest mb-1">
+              → {t("finding.what_to_do")}
             </h4>
-            <p className="text-xs text-slate-200 leading-relaxed bg-accent-dim border border-accent/30 rounded-lg px-3 py-2">
+            <p className="text-xs text-slate-200 leading-relaxed">
               {finding.recommended_action}
             </p>
           </div>

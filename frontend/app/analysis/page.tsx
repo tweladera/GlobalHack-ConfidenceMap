@@ -631,7 +631,7 @@ export default function AnalysisPage() {
                   {t("analysis.timeout")}
                 </div>
               )}
-              <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} />
+              <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} globalScore={globalScore} />
             </>
           )}
         </div>}
@@ -787,15 +787,20 @@ export default function AnalysisPage() {
                         {consolidationResult.confirmed_criticals.map((c, i) => (
                           <div
                             key={i}
-                            className="rounded-lg border border-confidence-red/30 bg-confidence-red-dim p-2.5"
+                            className="relative rounded-lg border border-confidence-red/30 bg-confidence-red-dim pl-4 pr-2.5 py-2.5 overflow-hidden"
                           >
-                            <p className="text-xs font-semibold text-slate-200 mb-1 leading-snug">
-                              {c.topic}
-                            </p>
-                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                            {/* Left accent strip */}
+                            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-confidence-red rounded-l-lg" aria-hidden="true" />
+                            <div className="flex items-start gap-1.5 mb-1">
+                              <span className="text-confidence-red text-xs flex-shrink-0 mt-px" aria-hidden="true">⚠</span>
+                              <p className="text-xs font-semibold text-slate-100 leading-snug">
+                                {c.topic}
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-slate-400 leading-relaxed pl-4">
                               {c.combined_evidence}
                             </p>
-                            <p className="text-[10px] text-confidence-red mt-1 font-mono">
+                            <p className="text-[10px] text-confidence-red/70 mt-1.5 font-mono pl-4">
                               {c.agents.join(" · ")}
                             </p>
                           </div>
