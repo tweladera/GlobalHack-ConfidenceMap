@@ -751,6 +751,35 @@ export default function AnalysisPage() {
               <p className="text-xs font-mono text-accent animate-pulse">Cross-agent audit in progress...</p>
               <p className="text-xs text-slate-600">Consolidating findings from all agents</p>
             </div>
+          ) : agents.some((a) => a.status !== "pending") ? (
+            /* Skeleton — agents running, findings not yet arrived */
+            <div
+              className="space-y-2 animate-fade-in"
+              aria-label="Loading findings"
+              aria-busy="true"
+            >
+              <div className="h-2.5 w-28 bg-surface-border rounded animate-pulse mb-4" />
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="px-3 py-3 rounded-lg border border-surface-border space-y-2"
+                  style={{ opacity: 1 - i * 0.16 }}
+                  aria-hidden="true"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="w-2 h-2 rounded-full bg-surface-border animate-pulse mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div
+                        className="h-2.5 bg-surface-border rounded animate-pulse"
+                        style={{ width: `${78 - i * 9}%` }}
+                      />
+                      <div className="h-2 bg-surface-border rounded animate-pulse w-1/4" />
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-surface-border rounded-full animate-pulse" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-slate-600">
               <div className="text-4xl" aria-hidden="true">◎</div>
