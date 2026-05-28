@@ -16,7 +16,14 @@ function HomePageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
+  const [activePane, setActivePane] = useState<"spec" | "arch">("spec");
   const specRef = useRef<HTMLTextAreaElement>(null);
+
+  const specLines = spec ? spec.split("\n").length : 0;
+  const archLines = architecture ? architecture.split("\n").length : 0;
+  const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+  const specStats = spec ? `${specLines} lines · ${fmt(spec.length)} chars` : "empty";
+  const archStats = architecture ? `${archLines} lines · ${fmt(architecture.length)} chars` : "empty";
 
   useEffect(() => {
     setHistory(getHistory());
@@ -103,69 +110,86 @@ function HomePageContent() {
 
       {/* Input area */}
       <section
-        className="w-full max-w-3xl bg-surface-card border border-surface-border rounded-2xl p-6 animate-slide-up"
+        className="w-full max-w-5xl bg-surface-card border border-surface-border rounded-2xl p-6 animate-slide-up"
         aria-label="Specification input"
       >
-        {/* Confidence legend */}
-        <div
-          className="flex gap-4 mb-6 text-sm"
-          role="note"
-          aria-label="Confidence level legend"
-        >
-          {([
-            { level: "green", key: "legend.green" },
-            { level: "yellow", key: "legend.yellow" },
-            { level: "red", key: "legend.red" },
-          ] as const).map(({ level, key }) => (
-            <div key={level} className="flex items-center gap-1.5">
-              <span
-                className={`w-2.5 h-2.5 rounded-full bg-confidence-${level}`}
-                aria-hidden="true"
-              />
-              <span className="text-slate-400">{t(key)}</span>
+        {/* Top bar: legend + mobile pane tabs */}
+        <div className="flex items-center justify-between mb-4">
+          <div
+            className="flex gap-4 text-xs"
+            role="note"
+            aria-label="Confidence level legend"
+          >
+            {([
+              { level: "green", key: "legend.green" },
+              { level: "yellow", key: "legend.yellow" },
+              { level: "red", key: "legend.red" },
+            ] as const).map(({ level, key }) => (
+              <div key={level} className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full bg-confidence-${level}`} aria-hidden="true" />
+                <span className="text-slate-400">{t(key)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile-only tabs */}
+          <div className="flex md:hidden gap-1">
+            {(["spec", "arch"] as const).map((pane) => (
+              <button
+                key={pane}
+                onClick={() => setActivePane(pane)}
+                className={`text-xs px-3 py-1 rounded-lg font-mono transition-colors ${
+                  activePane === pane
+                    ? "bg-accent text-white"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                {pane === "spec" ? "PRD" : "Architecture"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Split editor */}
+        <div className="flex flex-col md:flex-row gap-3 mb-6">
+          {/* ── Spec pane ── */}
+          <div className={`flex-1 flex flex-col ${activePane !== "spec" ? "hidden md:flex" : "flex"}`}>
+            <div className="flex items-center justify-between px-3 py-2 bg-surface rounded-t-xl border border-surface-border border-b-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-300">{t("home.spec_label")}</span>
+                <span className="text-confidence-red text-xs font-bold" aria-label="required">*</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-600" aria-live="polite">{specStats}</span>
             </div>
-          ))}
-        </div>
+            <textarea
+              id="spec-input"
+              ref={specRef}
+              value={spec}
+              onChange={(e) => setSpec(e.target.value)}
+              placeholder={t("home.spec_placeholder")}
+              className="h-72 bg-surface border border-surface-border rounded-b-xl px-4 py-3 text-slate-200 placeholder-slate-600 font-mono text-sm resize-none focus:border-accent focus:outline-none transition-colors"
+              aria-required="true"
+              aria-describedby={error ? "spec-error" : undefined}
+            />
+          </div>
 
-        {/* Spec input */}
-        <div className="mb-4">
-          <label
-            htmlFor="spec-input"
-            className="block text-sm font-medium text-slate-300 mb-2"
-          >
-            {t("home.spec_label")}{" "}
-            <span className="text-confidence-red" aria-label="required">*</span>
-          </label>
-          <textarea
-            id="spec-input"
-            ref={specRef}
-            value={spec}
-            onChange={(e) => setSpec(e.target.value)}
-            rows={14}
-            placeholder={t("home.spec_placeholder")}
-            className="w-full bg-surface border border-surface-border rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 font-mono text-sm resize-none focus:border-accent focus:outline-none transition-colors"
-            aria-required="true"
-            aria-describedby={error ? "spec-error" : undefined}
-          />
-        </div>
-
-        {/* Architecture input */}
-        <div className="mb-6">
-          <label
-            htmlFor="arch-input"
-            className="block text-sm font-medium text-slate-300 mb-2"
-          >
-            {t("home.arch_label")}{" "}
-            <span className="text-slate-500 font-normal">{t("home.arch_optional")}</span>
-          </label>
-          <textarea
-            id="arch-input"
-            value={architecture}
-            onChange={(e) => setArchitecture(e.target.value)}
-            rows={5}
-            placeholder={t("home.arch_placeholder")}
-            className="w-full bg-surface border border-surface-border rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 font-mono text-sm resize-none focus:border-accent focus:outline-none transition-colors"
-          />
+          {/* ── Architecture pane ── */}
+          <div className={`flex-1 flex flex-col ${activePane !== "arch" ? "hidden md:flex" : "flex"}`}>
+            <div className="flex items-center justify-between px-3 py-2 bg-surface rounded-t-xl border border-surface-border border-b-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-300">{t("home.arch_label")}</span>
+                <span className="text-[10px] text-slate-500 font-normal">{t("home.arch_optional")}</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-600" aria-live="polite">{archStats}</span>
+            </div>
+            <textarea
+              id="arch-input"
+              value={architecture}
+              onChange={(e) => setArchitecture(e.target.value)}
+              placeholder={t("home.arch_placeholder")}
+              className="h-72 bg-surface border border-surface-border rounded-b-xl px-4 py-3 text-slate-200 placeholder-slate-600 font-mono text-sm resize-none focus:border-accent focus:outline-none transition-colors"
+            />
+          </div>
         </div>
 
         {error && (
@@ -231,14 +255,14 @@ function HomePageContent() {
 
       {/* Agents preview */}
       <section
-        className="mt-10 w-full max-w-3xl"
+        className="mt-10 w-full max-w-5xl"
         aria-label="Available analysis agents"
       >
         <p className="text-center text-slate-500 text-sm mb-4">
           {t("home.agents_subtitle")}
         </p>
         <ul
-          className="grid grid-cols-2 md:grid-cols-3 gap-3"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
           role="list"
           aria-label="Analysis agents"
         >
@@ -262,7 +286,7 @@ function HomePageContent() {
       </section>
       {/* History */}
       {history.length > 0 && (
-        <section className="mt-8 w-full max-w-3xl" aria-label="Recent analyses">
+        <section className="mt-8 w-full max-w-5xl" aria-label="Recent analyses">
           <div className="flex items-center justify-between mb-3">
             <p className="text-slate-500 text-sm">Recent analyses</p>
             <button
