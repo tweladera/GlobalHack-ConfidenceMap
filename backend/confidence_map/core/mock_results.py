@@ -6,9 +6,16 @@ Findings are based on the NovaBank international payments spec.
 
 from __future__ import annotations
 
-from typing import Any
-
-from confidence_map.models.findings import AgentResult, AgentStatus, ConfidenceLevel, Finding
+from confidence_map.models.findings import (
+    AgentResult,
+    AgentStatus,
+    ConfidenceLevel,
+    ConfirmedCritical,
+    ConsolidatorResult,
+    Contradiction,
+    Finding,
+    Redundancy,
+)
 
 # Simulated agent completion times (seconds) — realistic but fast for demo
 AGENT_DELAYS: dict[str, float] = {
@@ -21,9 +28,9 @@ AGENT_DELAYS: dict[str, float] = {
 }
 
 
-def get_mock_results(language: str = "en") -> dict[str, AgentResult]:
+def get_mock_results() -> dict[str, AgentResult]:
     """Return pre-generated AgentResult for each agent keyed by agent_id."""
-    results = {
+    return {
         "spec_analyst": _spec_analyst(),
         "arch_validator": _arch_validator(),
         "risk_intelligence": _risk_intelligence(),
@@ -31,26 +38,6 @@ def get_mock_results(language: str = "en") -> dict[str, AgentResult]:
         "accessibility_advocate": _accessibility_advocate(),
         "delivery_historian": _delivery_historian(),
     }
-    if language != "en":
-        _apply_translations(results, language)
-    return results
-
-
-def _apply_translations(results: dict[str, AgentResult], language: str) -> None:
-    """Patch summaries and finding titles with translated versions for DEMO_MODE."""
-    if language not in _TRANSLATIONS:
-        return
-    lang_data = _TRANSLATIONS[language]
-    for agent_id, result in results.items():
-        if agent_id not in lang_data:
-            continue
-        agent_data = lang_data[agent_id]
-        if "summary" in agent_data:
-            result.summary = agent_data["summary"]
-        title_map: dict[str, str] = agent_data.get("titles", {})
-        for finding in result.findings:
-            if finding.title in title_map:
-                finding.title = title_map[finding.title]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -85,7 +72,14 @@ def _f(
     )
 
 
-def _result(agent_id: str, agent_name: str, agent_icon: str, findings: list[Finding], summary: str) -> AgentResult:
+def _result(
+    agent_id: str,
+    agent_name: str,
+    agent_icon: str,
+    findings: list[Finding],
+    summary: str,
+    thinking: str = "",
+) -> AgentResult:
     return AgentResult(
         agent_id=agent_id,
         agent_name=agent_name,
@@ -93,6 +87,7 @@ def _result(agent_id: str, agent_name: str, agent_icon: str, findings: list[Find
         status=AgentStatus.COMPLETED,
         findings=findings,
         summary=summary,
+        thinking=thinking,
     )
 
 
@@ -235,6 +230,29 @@ def _spec_analyst() -> AgentResult:
         "the payment failure story is too vague to implement, and there is a contradiction "
         "between the 'automatic update' criterion and the proposed polling. "
         "A refinement session with Sofia and Daniel is recommended before development begins.",
+        thinking=(
+            "I'll analyze the NovaBank international payments spec carefully, "
+            "looking for explicit definitions, contradictions, and gaps.\n\n"
+            "Starting with explicit definitions: the 10-second regulatory SLA appears in the "
+            "business context section but is absent from all user story acceptance criteria. "
+            "This means QA cannot write an automatable acceptance test for it — that's a gap.\n\n"
+            "US-001 (initiate payment): the acceptance criteria list the required fields, "
+            "but what happens when CoreBanking exceeds the SLA? The spec says "
+            "'the payment must complete within 10 seconds' but never defines the failure path. "
+            "Without this, engineers might implement automatic retry on timeout, "
+            "which would generate duplicate payments — the most dangerous failure mode "
+            "in a payment system. RED, high urgency.\n\n"
+            "US-002 (payment status): 'updates automatically without refreshing the page' "
+            "vs. technical notes saying 'polling every 3 seconds'. These are contradictory. "
+            "Polling is not automatic push — it has up to 3 second latency. "
+            "The product owner needs to decide: is 3s acceptable? "
+            "If yes, update the AC. If not, implement WebSockets before the sprint starts.\n\n"
+            "US-003 (failure handling): 'indicate what to do next' is dangerously vague. "
+            "What ARE the next steps? Retry? Contact support? Cancel? "
+            "This needs explicit acceptance criteria before engineering begins.\n\n"
+            "US-004 (CSV export): no field specification, no mention of whether sensitive data "
+            "like IBAN is exported in full or masked. In a PCI-DSS context this is a risk."
+        ),
     )
 
 
@@ -367,6 +385,31 @@ def _arch_validator() -> AgentResult:
         "and the lack of a circuit breaker create a cascading failure risk. "
         "Third, without idempotency, retries will certainly generate duplicate payments. "
         "Priority recommendations: async CoreBanking decoupling, explicit timeout, and idempotency key.",
+        thinking=(
+            "I need to validate the proposed architecture against the business requirements, "
+            "focusing on correctness, resilience, and scalability.\n\n"
+            "Critical math first: CoreBanking v2.1 has documented latency of 2-15 seconds. "
+            "FraudShield adds ~3 seconds. At P95, total = 15s + 3s = 18 seconds. "
+            "The regulatory SLA is 10 seconds. 18 > 10. "
+            "This is mathematically impossible under the current synchronous architecture. "
+            "This is my most critical finding — the team cannot ship without redesigning this flow. "
+            "The fix is an async 202 Accepted pattern: the endpoint returns immediately with a "
+            "transaction ID, and status is polled or pushed via WebSocket.\n\n"
+            "API Gateway: single Node.js/Express instance, no load balancer, no redundancy. "
+            "Any deployment or restart makes the system completely unavailable. "
+            "The spec promises 99.9% availability — that's ~8.7 hours downtime per year. "
+            "A single unplanned restart consumes a significant portion of that budget.\n\n"
+            "Payment Service calls CoreBanking with no configured timeout. "
+            "HTTP client default is typically infinite. If CoreBanking degrades, "
+            "all threads block waiting for a response, connection pool exhausts, "
+            "and the entire Payment Service goes down. Classic cascading failure.\n\n"
+            "No idempotency key mechanism anywhere in the system. "
+            "Combined with the undefined retry behavior from the spec, "
+            "this guarantees duplicate payments on any retry scenario.\n\n"
+            "SendGrid called synchronously per transaction with no queue. "
+            "If SendGrid fails (0.1% downtime), the transaction was already processed "
+            "but the client receives no email confirmation. Silent failure."
+        ),
     )
 
 
@@ -849,336 +892,92 @@ def _delivery_historian() -> AgentResult:
     )
 
 
-# ── Demo-mode translations (summaries + finding titles) ───────────────────────
-# Applied when DEMO_MODE=true and language != "en".
-# Descriptions/evidence/recommendations remain in English for demo brevity.
+# ── Consolidator mock ─────────────────────────────────────────────────────────
 
-_TRANSLATIONS: dict[str, dict[str, dict[str, Any]]] = {
-    "es": {
-        "spec_analyst": {
-            "summary": (
-                "El análisis de la especificación de NovaBank revela cinco problemas críticos. "
-                "El más urgente: el comportamiento del timeout de CoreBanking no está definido, "
-                "creando riesgo directo de pagos duplicados. Además, el SLA regulatorio de 10 "
-                "segundos no aparece en los criterios de aceptación, la historia de fallo del "
-                "pago es demasiado vaga para implementar, y existe una contradicción entre el "
-                "criterio de 'actualización automática' y el polling propuesto. Se recomienda "
-                "una sesión de refinamiento con Sofia y Daniel antes de comenzar el desarrollo."
+
+def get_mock_consolidation() -> ConsolidatorResult:
+    """Pre-generated ConsolidatorResult for the NovaBank demo case."""
+    return ConsolidatorResult(
+        contradictions=[
+            Contradiction(
+                topic="CoreBanking timeout: spec gap vs. engineering gap",
+                agents=["spec_analyst", "arch_validator"],
+                description=(
+                    "Spec Analyst flags an undefined timeout behavior as a product gap — "
+                    "the spec says nothing about what happens when CoreBanking exceeds the SLA. "
+                    "Arch Validator flags the same scenario as an engineering risk: "
+                    "no HTTP timeout is configured on the client, causing thread starvation. "
+                    "Both assign RED but assign responsibility to different layers."
+                ),
+                resolution=(
+                    "Both findings are valid and complementary, not contradictory. "
+                    "Spec Analyst's finding is the prerequisite: engineers cannot implement "
+                    "the correct timeout behavior without a product decision first. "
+                    "Prioritize Spec Analyst's as the blocker; Arch Validator's "
+                    "8-second httpx timeout is the immediate implementation action once "
+                    "the product decision is made."
+                ),
             ),
-            "titles": {
-                "CoreBanking timeout behavior not defined": (
-                    "Comportamiento del timeout de CoreBanking no definido"
+        ],
+        confirmed_criticals=[
+            ConfirmedCritical(
+                topic="No idempotency — duplicate payment risk",
+                agents=["arch_validator", "delivery_historian"],
+                combined_evidence=(
+                    "Arch Validator: 'No idempotency mechanism implemented in transactions — "
+                    "retries will generate duplicate payments in CoreBanking.' "
+                    "Delivery Historian independently corroborates with a documented incident: "
+                    "a 2019 European bank produced 900,000 duplicate payments from exactly this "
+                    "pattern — synchronous gateway + retries + no idempotency key. "
+                    "Recovery took 3 weeks and cost EUR 12M in reversals."
                 ),
-                "US-003: 'What to do next' on failure not specified": (
-                    "US-003: 'Qué hacer' ante fallo no especificado"
-                ),
-                "10-second regulatory SLA absent from acceptance criteria": (
-                    "SLA regulatorio de 10 segundos ausente de los criterios de aceptación"
-                ),
-                "US-002: Auto-update mechanism contradicts technical notes": (
-                    "US-002: Mecanismo de actualización automática contradice notas técnicas"
-                ),
-                "Transaction history: export criteria incomplete": (
-                    "Historial de transacciones: criterios de exportación incompletos"
-                ),
-            },
-        },
-        "arch_validator": {
-            "summary": (
-                "La arquitectura propuesta tiene tres problemas bloqueantes para producción. "
-                "Primero, la combinación de latencias de CoreBanking (2-15s) y antifraude (3s) "
-                "hace matemáticamente imposible cumplir el SLA regulatorio de 10 segundos. "
-                "Segundo, la ausencia de timeout en las llamadas a CoreBanking y la falta de "
-                "circuit breaker crean riesgo de falla en cascada. Tercero, sin idempotencia, "
-                "los reintentos generarán pagos duplicados con certeza. Recomendaciones "
-                "prioritarias: desacoplamiento async de CoreBanking, timeout explícito e "
-                "idempotencia."
             ),
-            "titles": {
-                "Synchronous CoreBanking (2-15s) makes 10s SLA mathematically impossible": (
-                    "CoreBanking síncrono (2-15s) hace el SLA de 10s matemáticamente imposible"
+            ConfirmedCritical(
+                topic="CoreBanking cascading failure — no timeout or circuit breaker",
+                agents=["arch_validator", "risk_intelligence", "delivery_historian"],
+                combined_evidence=(
+                    "Three agents independently flagged this as a production blocker. "
+                    "Arch Validator: no timeout configured, thread starvation will bring down Payment Service. "
+                    "Risk Intelligence: no circuit breaker means any CoreBanking degradation "
+                    "cascades to the entire platform. "
+                    "Delivery Historian: Amazon's 2004 post-mortem on this exact pattern "
+                    "led to the invention of circuit breaker design."
                 ),
-                "Single-instance API Gateway: single point of failure in a financial system": (
-                    "API Gateway de instancia única: punto único de falla en sistema financiero"
-                ),
-                "No timeout on CoreBanking calls: thread starvation risk": (
-                    "Sin timeout en llamadas a CoreBanking: riesgo de agotamiento de hilos"
-                ),
-                "No idempotency: retries will generate duplicate payments": (
-                    "Sin idempotencia: los reintentos generarán pagos duplicados"
-                ),
-                "Synchronous notifications without queue: silent loss on SendGrid failure": (
-                    "Notificaciones síncronas sin cola: pérdida silenciosa ante fallo de SendGrid"
-                ),
-            },
-        },
-        "risk_intelligence": {
-            "summary": (
-                "El análisis de riesgos identifica vulnerabilidades críticas de seguridad y "
-                "resiliencia. El riesgo más severo es la ausencia de un circuit breaker al "
-                "CoreBanking legado, lo que garantiza una falla en cascada en la primera "
-                "degradación del sistema legado. Segundo, el cumplimiento PCI-DSS está declarado "
-                "pero no implementado: no hay definición de cifrado para datos IBAN/SWIFT ni "
-                "gestión de claves. Adicionalmente, la falta de rollback transaccional generará "
-                "inconsistencias de datos desde el primer incidente en producción."
             ),
-            "titles": {
-                "No circuit breaker to CoreBanking: guaranteed cascading failure": (
-                    "Sin circuit breaker a CoreBanking: falla en cascada garantizada"
+            ConfirmedCritical(
+                topic="Regulatory SLA violation guaranteed by architecture",
+                agents=["arch_validator", "business_impact"],
+                combined_evidence=(
+                    "Arch Validator proves mathematically: CoreBanking (2-15s) + FraudShield (3s) "
+                    "= 5-18s total, exceeding the 10-second regulatory SLA at P95 under normal load. "
+                    "Business Impact quantifies the exposure: $50K-$500K USD in fines per quarter "
+                    "from launch day. The cost of the async redesign (2-3 sprints) is less than "
+                    "the first fine."
                 ),
-                "PCI-DSS Level 1 declared but account data encryption not defined": (
-                    "PCI-DSS Nivel 1 declarado pero cifrado de datos de cuenta no definido"
-                ),
-                "No rate limiting on the API Gateway": (
-                    "Sin rate limiting en el API Gateway"
-                ),
-                "No transactional rollback strategy": (
-                    "Sin estrategia de rollback transaccional"
-                ),
-                "Audit traceability required but implementation not specified": (
-                    "Trazabilidad de auditoría requerida pero implementación no especificada"
-                ),
-            },
-        },
-        "business_impact": {
-            "summary": (
-                "El análisis de impacto de negocio identifica riesgos financieros directos y "
-                "cuantificables. El más urgente: la arquitectura garantiza incumplimiento "
-                "regulatorio del SLA, con multas potenciales que superan el costo del proyecto "
-                "desde el primer trimestre. El crecimiento proyectado del 300% es incompatible "
-                "con la infraestructura on-premise actual, creando un techo de escalabilidad "
-                "que llegará antes de que el producto alcance la rentabilidad. Este análisis "
-                "debe presentarse a los stakeholders de negocio antes de aprobar el MVP."
             ),
-            "titles": {
-                "Regulatory SLA non-compliance: quantifiable fines from day one": (
-                    "Incumplimiento SLA regulatorio: multas cuantificables desde el primer día"
-                ),
-                "300% growth with on-premise infrastructure: uncapped operational cost": (
-                    "Crecimiento 300% con infraestructura on-premise: costo operacional sin techo"
-                ),
-                "User-visible latency impacts conversion against competitors": (
-                    "Latencia visible al usuario impacta conversión frente a competidores"
-                ),
-                "Oracle 11g technical debt will block product evolution in 6 months": (
-                    "Deuda técnica Oracle 11g bloqueará evolución del producto en 6 meses"
-                ),
-            },
-        },
-        "accessibility_advocate": {
-            "summary": (
-                "El análisis de accesibilidad identifica cuatro brechas contra WCAG 2.1 AA. "
-                "La más crítica: las actualizaciones de estado por polling no serán anunciadas "
-                "a los lectores de pantalla, dejando a los usuarios con discapacidad visual sin "
-                "información sobre el resultado de sus pagos. Además, el enfoque mobile-last "
-                "excluye a la mayoría de los usuarios de tecnologías de asistencia en LATAM. "
-                "Estos problemas son significativamente más baratos de resolver en diseño que "
-                "en código — Elena debería revisar los mockups antes de que el equipo comience "
-                "el desarrollo frontend."
+        ],
+        redundancies=[
+            Redundancy(
+                topic="CoreBanking thread starvation and cascading failure",
+                agents=["arch_validator", "risk_intelligence", "delivery_historian"],
+                kept="risk_intelligence",
             ),
-            "titles": {
-                "Polling without aria-live: screen reader users receive no status updates": (
-                    "Polling sin aria-live: usuarios de lector de pantalla sin actualizaciones"
-                ),
-                "Mobile-last design excludes most-used assistive technologies": (
-                    "Diseño mobile-last excluye las tecnologías de asistencia más usadas"
-                ),
-                "PDF receipt without document accessibility specification": (
-                    "Recibo PDF sin especificación de accesibilidad del documento"
-                ),
-                "Payment error messages: visual dependency not defined": (
-                    "Mensajes de error de pago: dependencia visual no definida"
-                ),
-            },
-        },
-        "delivery_historian": {
-            "summary": (
-                "El análisis histórico identifica que NovaBank está reproduciendo tres patrones "
-                "de falla bien documentados de la industria fintech. El más urgente: la ausencia "
-                "de idempotencia en un sistema con reintentos es el mismo patrón que causó "
-                "900,000 pagos duplicados en un banco europeo en 2019. La recomendación es "
-                "clara: implementar idempotencia y circuit breaker son requisitos no negociables "
-                "antes del lanzamiento. Además, la estimativa de 6 semanas para la integración "
-                "con el SWIFT legado es optimista — Marcus debería planificar con 100% de buffer "
-                "para la integración con CoreBanking."
+            Redundancy(
+                topic="No idempotency in payment processing",
+                agents=["arch_validator", "delivery_historian"],
+                kept="delivery_historian",
             ),
-            "titles": {
-                "No idempotency in payments: this pattern caused 900K duplicates in production": (
-                    "Sin idempotencia en pagos: este patrón causó 900K duplicados en producción"
-                ),
-                "Thread starvation from synchronous calls to legacy: cascading failure pattern": (
-                    "Agotamiento de hilos por llamadas síncronas al legado: falla en cascada"
-                ),
-                "Legacy SWIFT integration in 6 weeks: historically takes double the estimate": (
-                    "Integración SWIFT legada en 6 semanas: históricamente toma el doble"
-                ),
-                "Manual deployment on a critical financial system: second leading cause of production incidents": (
-                    "Deploy manual en sistema financiero crítico: segunda causa de incidentes"
-                ),
-            },
-        },
-    },
-    "pt": {
-        "spec_analyst": {
-            "summary": (
-                "A análise da especificação do NovaBank revela cinco problemas críticos. "
-                "O mais urgente: o comportamento do timeout do CoreBanking não está definido, "
-                "criando risco direto de pagamentos duplicados. Além disso, o SLA regulatório "
-                "de 10 segundos não aparece nos critérios de aceitação, a história de falha do "
-                "pagamento é muito vaga para implementar, e há uma contradição entre o critério "
-                "de 'atualização automática' e o polling proposto. Recomenda-se uma sessão de "
-                "refinamento com Sofia e Daniel antes do início do desenvolvimento."
-            ),
-            "titles": {
-                "CoreBanking timeout behavior not defined": (
-                    "Comportamento do timeout do CoreBanking não definido"
-                ),
-                "US-003: 'What to do next' on failure not specified": (
-                    "US-003: 'O que fazer' em caso de falha não especificado"
-                ),
-                "10-second regulatory SLA absent from acceptance criteria": (
-                    "SLA regulatório de 10 segundos ausente dos critérios de aceitação"
-                ),
-                "US-002: Auto-update mechanism contradicts technical notes": (
-                    "US-002: Mecanismo de atualização automática contradiz as notas técnicas"
-                ),
-                "Transaction history: export criteria incomplete": (
-                    "Histórico de transações: critérios de exportação incompletos"
-                ),
-            },
-        },
-        "arch_validator": {
-            "summary": (
-                "A arquitetura proposta tem três problemas bloqueantes para produção. Primeiro, "
-                "a combinação de latências do CoreBanking (2-15s) e antifraude (3s) torna "
-                "matematicamente impossível cumprir o SLA regulatório de 10 segundos. Segundo, "
-                "a ausência de timeout nas chamadas ao CoreBanking e a falta de circuit breaker "
-                "criam risco de falha em cascata. Terceiro, sem idempotência, os "
-                "reprocessamentos gerarão pagamentos duplicados com certeza. Recomendações "
-                "prioritárias: desacoplamento async do CoreBanking, timeout explícito e "
-                "idempotência."
-            ),
-            "titles": {
-                "Synchronous CoreBanking (2-15s) makes 10s SLA mathematically impossible": (
-                    "CoreBanking síncrono (2-15s) torna o SLA de 10s matematicamente impossível"
-                ),
-                "Single-instance API Gateway: single point of failure in a financial system": (
-                    "API Gateway de instância única: ponto único de falha em sistema financeiro"
-                ),
-                "No timeout on CoreBanking calls: thread starvation risk": (
-                    "Sem timeout nas chamadas ao CoreBanking: risco de esgotamento de threads"
-                ),
-                "No idempotency: retries will generate duplicate payments": (
-                    "Sem idempotência: reprocessamentos gerarão pagamentos duplicados"
-                ),
-                "Synchronous notifications without queue: silent loss on SendGrid failure": (
-                    "Notificações síncronas sem fila: perda silenciosa em falha do SendGrid"
-                ),
-            },
-        },
-        "risk_intelligence": {
-            "summary": (
-                "A análise de riscos identifica vulnerabilidades críticas de segurança e "
-                "resiliência. O risco mais severo é a ausência de um circuit breaker para o "
-                "CoreBanking legado, o que garante falha em cascata na primeira degradação do "
-                "sistema legado. Segundo, a conformidade PCI-DSS está declarada mas não "
-                "implementada: não há definição de criptografia para dados IBAN/SWIFT nem gestão "
-                "de chaves. Adicionalmente, a falta de rollback transacional gerará "
-                "inconsistências de dados desde o primeiro incidente em produção."
-            ),
-            "titles": {
-                "No circuit breaker to CoreBanking: guaranteed cascading failure": (
-                    "Sem circuit breaker para o CoreBanking: falha em cascata garantida"
-                ),
-                "PCI-DSS Level 1 declared but account data encryption not defined": (
-                    "PCI-DSS Nível 1 declarado mas criptografia de dados de conta não definida"
-                ),
-                "No rate limiting on the API Gateway": (
-                    "Sem rate limiting no API Gateway"
-                ),
-                "No transactional rollback strategy": (
-                    "Sem estratégia de rollback transacional"
-                ),
-                "Audit traceability required but implementation not specified": (
-                    "Rastreabilidade de auditoria exigida mas implementação não especificada"
-                ),
-            },
-        },
-        "business_impact": {
-            "summary": (
-                "A análise de impacto de negócio identifica riscos financeiros diretos e "
-                "quantificáveis. O mais urgente: a arquitetura garante descumprimento regulatório "
-                "do SLA, com multas potenciais que superam o custo do projeto já no primeiro "
-                "trimestre. O crescimento projetado de 300% é incompatível com a infraestrutura "
-                "on-premise atual, criando um teto de escalabilidade que chegará antes de o "
-                "produto atingir a rentabilidade. Esta análise deve ser apresentada aos "
-                "stakeholders de negócio antes de aprovar o MVP."
-            ),
-            "titles": {
-                "Regulatory SLA non-compliance: quantifiable fines from day one": (
-                    "Descumprimento do SLA regulatório: multas quantificáveis desde o primeiro dia"
-                ),
-                "300% growth with on-premise infrastructure: uncapped operational cost": (
-                    "Crescimento de 300% com infraestrutura on-premise: custo operacional sem teto"
-                ),
-                "User-visible latency impacts conversion against competitors": (
-                    "Latência visível ao usuário impacta conversão frente aos concorrentes"
-                ),
-                "Oracle 11g technical debt will block product evolution in 6 months": (
-                    "Dívida técnica Oracle 11g bloqueará a evolução do produto em 6 meses"
-                ),
-            },
-        },
-        "accessibility_advocate": {
-            "summary": (
-                "A análise de acessibilidade identifica quatro lacunas em relação ao WCAG 2.1 AA. "
-                "A mais crítica: as atualizações de status por polling não serão anunciadas pelos "
-                "leitores de tela, deixando usuários com deficiência visual sem informação sobre "
-                "o resultado de seus pagamentos. Além disso, a abordagem mobile-last exclui a "
-                "maioria dos usuários de tecnologias assistivas na LATAM. Esses problemas são "
-                "significativamente mais baratos de resolver no design do que no código — Elena "
-                "deve revisar os mockups antes de o time iniciar o desenvolvimento frontend."
-            ),
-            "titles": {
-                "Polling without aria-live: screen reader users receive no status updates": (
-                    "Polling sem aria-live: usuários de leitor de tela sem atualizações de status"
-                ),
-                "Mobile-last design excludes most-used assistive technologies": (
-                    "Design mobile-last exclui as tecnologias assistivas mais usadas"
-                ),
-                "PDF receipt without document accessibility specification": (
-                    "Recibo PDF sem especificação de acessibilidade do documento"
-                ),
-                "Payment error messages: visual dependency not defined": (
-                    "Mensagens de erro de pagamento: dependência visual não definida"
-                ),
-            },
-        },
-        "delivery_historian": {
-            "summary": (
-                "A análise histórica identifica que o NovaBank está reproduzindo três padrões "
-                "de falha bem documentados da indústria fintech. O mais urgente: a ausência de "
-                "idempotência em um sistema com reprocessamentos é o mesmo padrão que causou "
-                "900.000 pagamentos duplicados em um banco europeu em 2019. A recomendação é "
-                "clara: implementar idempotência e circuit breaker são requisitos não "
-                "negociáveis antes do lançamento. Além disso, a estimativa de 6 semanas para a "
-                "integração com o SWIFT legado é otimista — Marcus deve planejar com 100% de "
-                "buffer para a integração com o CoreBanking."
-            ),
-            "titles": {
-                "No idempotency in payments: this pattern caused 900K duplicates in production": (
-                    "Sem idempotência em pagamentos: padrão causou 900K duplicados em produção"
-                ),
-                "Thread starvation from synchronous calls to legacy: cascading failure pattern": (
-                    "Esgotamento de threads por chamadas síncronas ao legado: falha em cascata"
-                ),
-                "Legacy SWIFT integration in 6 weeks: historically takes double the estimate": (
-                    "Integração SWIFT legada em 6 semanas: historicamente leva o dobro"
-                ),
-                "Manual deployment on a critical financial system: second leading cause of production incidents": (
-                    "Deploy manual em sistema financeiro crítico: segunda causa de incidentes"
-                ),
-            },
-        },
-    },
-}
+        ],
+        audit_summary=(
+            "The cross-agent audit confirms three production blockers independently corroborated "
+            "by multiple agents. Immediate actions required before any code reaches production: "
+            "(1) Implement idempotency keys with X-Idempotency-Key header and PostgreSQL "
+            "deduplication — failure to do so will replicate the 900K duplicate payment incident. "
+            "(2) Add an explicit 8-second timeout and circuit breaker to all CoreBanking calls — "
+            "no single engineering change has higher risk-mitigation value in this system. "
+            "(3) Redesign to async 202 Accepted pattern — the synchronous architecture cannot "
+            "meet the regulatory SLA under any realistic load. These three changes must be treated "
+            "as Sprint 0 prerequisites, not backlog items."
+        ),
+    )
+

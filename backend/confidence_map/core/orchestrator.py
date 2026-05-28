@@ -11,15 +11,16 @@ from confidence_map.agents import (
     accessibility_advocate,
     arch_validator,
     business_impact,
+    consolidator,
     delivery_historian,
     risk_intelligence,
     spec_analyst,
 )
-from confidence_map.core.mock_results import AGENT_DELAYS, get_mock_results
+from confidence_map.core.mock_results import AGENT_DELAYS, get_mock_consolidation, get_mock_results
 from confidence_map.core.settings import get_settings
 from confidence_map.models.analysis import AnalysisRequest, ConfidenceDistribution
 from confidence_map.models.events import SSEEvent, SSEEventType
-from confidence_map.models.findings import AgentResult
+from confidence_map.models.findings import AgentResult, Finding
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,11 @@ class _AgentModule(Protocol):
     AGENT_NAME: str
 
     def run(
-        self, spec: str, architecture: str, context: str, language: str
+        self,
+        spec: str,
+        architecture: str,
+        context: str,
+        spec_findings: list[Finding] | None,
     ) -> Coroutine[Any, Any, AgentResult]: ...
 
 
@@ -50,10 +55,14 @@ _PHASE2_AGENTS = [
     "delivery_historian",
 ]
 
+# Maximum number of agents allowed to call Claude concurrently.
+# Keeps 5 parallel agents from saturating rate limits simultaneously.
+_MAX_CONCURRENT_AGENTS = 3
 
-async def _stream_mock_analysis(language: str = "en") -> AsyncGenerator[SSEEvent, None]:
+
+async def _stream_mock_analysis() -> AsyncGenerator[SSEEvent, None]:
     """Emit pre-generated NovaBank mock results with simulated timing."""
-    mock_results = get_mock_results(language)
+    mock_results = get_mock_results()
     queue: asyncio.Queue[SSEEvent | None] = asyncio.Queue()
 
     async def emit_agent(agent_id: str) -> None:
@@ -79,6 +88,23 @@ async def _stream_mock_analysis(language: str = "en") -> AsyncGenerator[SSEEvent
     async def orchestrate() -> None:
         await emit_agent("spec_analyst")
         await asyncio.gather(*(emit_agent(aid) for aid in _PHASE2_AGENTS))
+        # Phase 3: cross-agent consolidation
+        await queue.put(
+            SSEEvent(
+                type=SSEEventType.CONSOLIDATION_START,
+                agent_id="consolidator",
+                agent_name="Consolidator",
+            )
+        )
+        await asyncio.sleep(1.5)  # simulate consolidator running
+        await queue.put(
+            SSEEvent(
+                type=SSEEventType.CONSOLIDATION_COMPLETE,
+                agent_id="consolidator",
+                agent_name="Consolidator",
+                consolidation=get_mock_consolidation(),
+            )
+        )
         await queue.put(None)
 
     task = asyncio.create_task(orchestrate())
@@ -126,7 +152,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
     Phase 2: Five remaining agents run concurrently via asyncio.gather.
     """
     if get_settings().demo_mode:
-        async for mock_event in _stream_mock_analysis(request.language):
+        async for mock_event in _stream_mock_analysis():
             yield mock_event
         return
 
@@ -136,18 +162,22 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         agent_module: _AgentModule,
         agent_id: str,
         agent_name: str,
-    ) -> None:
-        logger.info("[orchestrator] Putting AGENT_START for %s", agent_id)
-        await queue.put(
-            SSEEvent(type=SSEEventType.AGENT_START, agent_id=agent_id, agent_name=agent_name)
-        )
-        logger.info("[orchestrator] Calling agent %s", agent_id)
-        result: AgentResult = await agent_module.run(
-            spec=request.spec,
-            architecture=request.architecture,
-            context=request.context,
-            language=request.language,
-        )
+        spec_findings: list[Finding] | None = None,
+    ) -> AgentResult:
+        async with semaphore:
+            # Semaphore acquired: this agent now has a Claude API slot
+            logger.info("[orchestrator] Putting AGENT_START for %s", agent_id)
+            await queue.put(
+                SSEEvent(type=SSEEventType.AGENT_START, agent_id=agent_id, agent_name=agent_name)
+            )
+            logger.info("[orchestrator] Calling agent %s", agent_id)
+            result: AgentResult = await agent_module.run(
+                spec=request.spec,
+                architecture=request.architecture,
+                context=request.context,
+                spec_findings=spec_findings,
+            )
+        # Semaphore released — next waiting agent can proceed
         logger.info("[orchestrator] Agent %s done, status=%s", agent_id, result.status)
         event_type = (
             SSEEventType.AGENT_COMPLETE
@@ -163,22 +193,79 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
                 error=result.error,
             )
         )
+        return result
 
     async def orchestrate() -> None:
-        await run(spec_analyst, spec_analyst.AGENT_ID, spec_analyst.AGENT_NAME)
-        await asyncio.gather(
-            run(arch_validator, arch_validator.AGENT_ID, arch_validator.AGENT_NAME),
-            run(risk_intelligence, risk_intelligence.AGENT_ID, risk_intelligence.AGENT_NAME),
-            run(business_impact, business_impact.AGENT_ID, business_impact.AGENT_NAME),
-            run(
-                accessibility_advocate,
-                accessibility_advocate.AGENT_ID,
-                accessibility_advocate.AGENT_NAME,
-            ),
-            run(delivery_historian, delivery_historian.AGENT_ID, delivery_historian.AGENT_NAME),
+        # Phase 1: Spec Analyst runs first — its findings seed the shared blackboard
+        spec_result = await run(spec_analyst, spec_analyst.AGENT_ID, spec_analyst.AGENT_NAME)
+        blackboard: list[Finding] = spec_result.findings if spec_result.error is None else []
+        logger.info(
+            "[orchestrator] Blackboard seeded with %d spec_analyst findings", len(blackboard)
+        )
+
+        # Phase 2: five agents run in parallel, each receiving the shared blackboard
+        phase2_results: list[AgentResult] = list(
+            await asyncio.gather(
+                run(
+                    arch_validator,
+                    arch_validator.AGENT_ID,
+                    arch_validator.AGENT_NAME,
+                    blackboard,
+                ),
+                run(
+                    risk_intelligence,
+                    risk_intelligence.AGENT_ID,
+                    risk_intelligence.AGENT_NAME,
+                    blackboard,
+                ),
+                run(
+                    business_impact,
+                    business_impact.AGENT_ID,
+                    business_impact.AGENT_NAME,
+                    blackboard,
+                ),
+                run(
+                    accessibility_advocate,
+                    accessibility_advocate.AGENT_ID,
+                    accessibility_advocate.AGENT_NAME,
+                    blackboard,
+                ),
+                run(
+                    delivery_historian,
+                    delivery_historian.AGENT_ID,
+                    delivery_historian.AGENT_NAME,
+                    blackboard,
+                ),
+            )
+        )
+
+        # Phase 3: Consolidator cross-examines all findings
+        all_results: list[AgentResult] = [spec_result, *phase2_results]
+        logger.info("[orchestrator] Starting consolidation over %d agent results", len(all_results))
+        await queue.put(
+            SSEEvent(
+                type=SSEEventType.CONSOLIDATION_START,
+                agent_id="consolidator",
+                agent_name="Consolidator",
+            )
+        )
+        consolidation_result = await consolidator.run(all_results)
+        logger.info(
+            "[orchestrator] Consolidation done: %d criticals, %d contradictions",
+            len(consolidation_result.confirmed_criticals),
+            len(consolidation_result.contradictions),
+        )
+        await queue.put(
+            SSEEvent(
+                type=SSEEventType.CONSOLIDATION_COMPLETE,
+                agent_id="consolidator",
+                agent_name="Consolidator",
+                consolidation=consolidation_result,
+            )
         )
         await queue.put(None)  # sentinel
 
+    semaphore = asyncio.Semaphore(_MAX_CONCURRENT_AGENTS)
     logger.info("[orchestrator] Starting real-mode analysis, creating orchestrate task")
     task = asyncio.create_task(orchestrate())
     dist = ConfidenceDistribution()

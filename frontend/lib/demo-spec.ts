@@ -31,12 +31,8 @@ to transfer funds to suppliers abroad.
 **Acceptance criteria:**
 - The user enters: amount, destination currency, beneficiary IBAN/SWIFT account
 - The system validates available funds before processing
-- Transaction confirmation is displayed to the user
-- The payment must complete within the regulatory SLA
-
-**Technical notes:**
-- Processing goes through NovaBank's legacy SWIFT gateway (CoreBanking v2.1)
-- Anti-fraud validation is mandatory before execution
+- Transaction confirmation is displayed to the user within the regulatory SLA
+- Anti-fraud validation must pass before the payment is executed
 
 ### US-002: Query payment status
 As a client, I want to check the status of a payment in real time
@@ -67,17 +63,10 @@ to reconcile with my accounting.
 
 ---
 
-## Known technical constraints
-
-- The CoreBanking v2.1 SWIFT gateway is a synchronous system with latencies of 2-15 seconds
-- The external anti-fraud system (FraudShield) responds on average in 3 seconds
-- The accounts database is on Oracle 11g (does not support modern distributed transactions)
-- Current infrastructure: on-premise, no Kubernetes, manual deployment
-
 ## Non-functional requirements
 
 - High availability: the system must be available 99.9% of the time
-- Regulatory SLA requires confirmation in under 10 seconds
+- Regulatory SLA requires transaction confirmation in under 10 seconds
 - Support for peaks of up to 500 transactions per minute on accounting close days
 
 ## Security and compliance
@@ -217,6 +206,16 @@ export const DEMO_ARCH_AUTH = `# Proposed Architecture — NovaBank MFA
 
 export const DEMO_ARCHITECTURE = `# Proposed Architecture — NovaBank International Payments
 ## Author: Daniel Reyes, Software Architect
+
+### Technical constraints
+
+- CoreBanking v2.1 SWIFT gateway: synchronous REST API, on-premise, latency 2-15 seconds per call, no internal SLA documented
+- FraudShield (external anti-fraud system): average response time 3 seconds, called synchronously before every payment
+- Accounts database: Oracle 11g — read-only access from the new system, no support for modern distributed transactions
+- Infrastructure: on-premise VMs, no container orchestration, manual deployment and scaling
+- No idempotency mechanism implemented for payment transactions
+- No retry logic implemented anywhere in the payment pipeline
+- No timeout configured for CoreBanking calls (relies on HTTP client default)
 
 ### Main components
 

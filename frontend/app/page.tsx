@@ -4,14 +4,13 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DEMO_SPEC, DEMO_ARCHITECTURE, DEMO_SPEC_AUTH, DEMO_ARCH_AUTH } from "@/lib/demo-spec";
 import { useI18n } from "@/lib/i18n";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { getHistory, clearHistory } from "@/lib/history";
 import type { AnalysisRecord } from "@/lib/history";
 
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [spec, setSpec] = useState("");
   const [architecture, setArchitecture] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +55,7 @@ function HomePageContent() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec, architecture, language: lang }),
+        body: JSON.stringify({ spec, architecture }),
       });
 
       if (!res.ok) throw new Error("Failed to start analysis");
@@ -78,9 +77,6 @@ function HomePageContent() {
     >
       {/* Header */}
       <header className="text-center mb-12 animate-fade-in">
-        <div className="flex items-center justify-end mb-2 w-full max-w-3xl mx-auto">
-          <LanguageSwitcher />
-        </div>
         <div className="flex items-center justify-center gap-2 mb-4">
           <div
             className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center"

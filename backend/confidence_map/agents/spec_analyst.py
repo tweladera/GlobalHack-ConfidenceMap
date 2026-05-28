@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from confidence_map.agents.base import call_agent
-from confidence_map.models.findings import AgentResult
+from confidence_map.models.findings import AgentResult, Finding
 
 AGENT_ID = "spec_analyst"
 AGENT_NAME = "Spec Analyst"
@@ -37,7 +37,10 @@ Identify all ambiguities, contradictions, missing requirements, and risky assump
 
 
 async def run(
-    spec: str, architecture: str = "", context: str = "", language: str = "en"
+    spec: str,
+    architecture: str = "",
+    context: str = "",
+    spec_findings: list[Finding] | None = None,  # Phase 1 seeds the blackboard; ignored here
 ) -> AgentResult:
     arch_block = f"<architecture>{architecture}</architecture>\n\n" if architecture else ""
     ctx_block = f"<context>{context}</context>\n\n" if context else ""
@@ -49,5 +52,4 @@ async def run(
         user_prompt=_USER_TEMPLATE.format(
             spec=spec, arch_block=arch_block, ctx_block=ctx_block
         ),
-        language=language,
     )

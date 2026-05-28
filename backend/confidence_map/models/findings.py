@@ -55,3 +55,41 @@ class AgentResult(BaseModel):
     findings: list[Finding] = Field(default_factory=list)
     summary: str = ""
     error: str | None = None
+    thinking: str = ""  # Extended thinking chain-of-thought (empty when ENABLE_THINKING=false)
+
+
+# ── Consolidator models ────────────────────────────────────────────────────────
+
+
+class Contradiction(BaseModel):
+    """A conflict detected between two or more agent findings on the same topic."""
+
+    topic: str
+    agents: list[str]
+    description: str
+    resolution: str
+
+
+class ConfirmedCritical(BaseModel):
+    """A red finding independently corroborated by two or more agents."""
+
+    topic: str
+    agents: list[str]
+    combined_evidence: str
+
+
+class Redundancy(BaseModel):
+    """A finding reported by multiple agents that covers the same concern."""
+
+    topic: str
+    agents: list[str]
+    kept: str  # agent_id of the finding to surface (most complete evidence)
+
+
+class ConsolidatorResult(BaseModel):
+    """Structured output of the Consolidator (cross-agent audit)."""
+
+    contradictions: list[Contradiction] = Field(default_factory=list)
+    confirmed_criticals: list[ConfirmedCritical] = Field(default_factory=list)
+    redundancies: list[Redundancy] = Field(default_factory=list)
+    audit_summary: str = ""
