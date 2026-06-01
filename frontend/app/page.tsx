@@ -6,6 +6,42 @@ import { DEMO_SPEC, DEMO_ARCHITECTURE, DEMO_SPEC_AUTH, DEMO_ARCH_AUTH } from "@/
 import { useI18n } from "@/lib/i18n";
 import { getHistory, clearHistory } from "@/lib/history";
 import type { AnalysisRecord } from "@/lib/history";
+import { getConfig, saveConfig, DEFAULT_CONFIG } from "@/lib/config";
+import type { AnalysisConfig } from "@/lib/config";
+import { AGENT_DEFINITIONS } from "@/types";
+
+// ── Static preview data ──────────────────────────────────────────────────────
+
+const PREVIEW_AGENTS = [
+  { name: "Spec Analyst",          rank: 1, g: 2, y: 1, r: 1 },
+  { name: "Arch Validator",        rank: 2, g: 1, y: 2, r: 2 },
+  { name: "Risk Intelligence",     rank: 3, g: 0, y: 2, r: 3 },
+  { name: "Business Impact",       rank: 4, g: 2, y: 2, r: 0 },
+  { name: "Accessibility",         rank: 5, g: 1, y: 1, r: 1 },
+  { name: "Delivery Historian",    rank: 6, g: 2, y: 1, r: 0 },
+] as const;
+
+type PreviewLevel = "green" | "yellow" | "red";
+
+const PREVIEW_FINDINGS: { title: string; score: number; level: PreviewLevel }[] = [
+  { title: "No SLA documented for CoreBanking calls",          score: 28, level: "red"    },
+  { title: "Transaction idempotency mechanism absent",          score: 32, level: "red"    },
+  { title: "FraudShield latency may breach 10 s SLA",          score: 44, level: "yellow" },
+  { title: "SendGrid called directly — no retry on failure",    score: 55, level: "yellow" },
+  { title: "PCI-DSS Level 1 explicitly required in spec",       score: 84, level: "green"  },
+];
+
+const PREVIEW_BADGE = {
+  green:  "bg-confidence-green-dim  text-confidence-green",
+  yellow: "bg-confidence-yellow-dim text-confidence-yellow",
+  red:    "bg-confidence-red-dim    text-confidence-red",
+} as const;
+
+const PREVIEW_TEXT = {
+  green: "text-confidence-green", yellow: "text-confidence-yellow", red: "text-confidence-red",
+} as const;
+
+// ── Page component ────────────────────────────────────────────────────────────
 
 function HomePageContent() {
   const router = useRouter();
@@ -17,6 +53,8 @@ function HomePageContent() {
   const [error, setError] = useState("");
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
   const [activePane, setActivePane] = useState<"spec" | "arch">("spec");
+  const [showConfig, setShowConfig] = useState(false);
+  const [config, setConfig] = useState<AnalysisConfig>(DEFAULT_CONFIG);
   const specRef = useRef<HTMLTextAreaElement>(null);
 
   const specLines = spec ? spec.split("\n").length : 0;
@@ -27,6 +65,7 @@ function HomePageContent() {
 
   useEffect(() => {
     setHistory(getHistory());
+    setConfig(getConfig());
   }, []);
 
   // Auto-load preset from URL on mount: ?spec=payments | ?spec=auth
@@ -35,6 +74,14 @@ function HomePageContent() {
     if (preset === "payments") { setSpec(DEMO_SPEC); setArchitecture(DEMO_ARCHITECTURE); }
     else if (preset === "auth") { setSpec(DEMO_SPEC_AUTH); setArchitecture(DEMO_ARCH_AUTH); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateConfig = (patch: Partial<AnalysisConfig>) => {
+    setConfig((prev) => {
+      const next = { ...prev, ...patch };
+      saveConfig(next);
+      return next;
+    });
+  };
 
   const loadPreset = (preset: "payments" | "auth") => {
     if (preset === "payments") {
@@ -250,39 +297,235 @@ function HomePageContent() {
               </button>
             </div>
           </div>
+
+          {/* Settings toggle */}
+          <div>
+            <button
+              onClick={() => setShowConfig((v) => !v)}
+              className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 hover:text-slate-400 transition-colors"
+              aria-expanded={showConfig}
+              aria-controls="config-panel"
+            >
+              <span aria-hidden="true">{showConfig ? "▾" : "▸"}</span>
+              Analysis settings
+            </button>
+
+            {showConfig && (
+              <div
+                id="config-panel"
+                className="mt-3 p-4 bg-surface border border-surface-border rounded-xl space-y-4 animate-fade-in"
+              >
+                {/* Default view */}
+                <div>
+                  <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">
+                    Default view
+                  </p>
+                  <div className="flex gap-1.5">
+                    {(["map", "table", "text", "heat"] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => updateConfig({ defaultView: v })}
+                        className={`text-xs px-3 py-1 rounded-lg font-mono capitalize transition-colors ${
+                          config.defaultView === v
+                            ? "bg-accent text-white"
+                            : "border border-surface-border text-slate-500 hover:text-slate-300"
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Options */}
+                <div>
+                  <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">
+                    Options
+                  </p>
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={config.autoHideRedundant}
+                      onChange={(e) => updateConfig({ autoHideRedundant: e.target.checked })}
+                      className="w-3.5 h-3.5 accent-indigo-500"
+                    />
+                    <span className="text-xs text-slate-500 group-hover:text-slate-300 transition-colors">
+                      Auto-hide redundant findings
+                    </span>
+                  </label>
+                </div>
+
+                {/* Agent selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                      Agents
+                    </p>
+                    <button
+                      onClick={() => updateConfig({ enabledAgents: [] })}
+                      className="text-[10px] font-mono text-slate-600 hover:text-slate-400 transition-colors"
+                    >
+                      reset all
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-y-1.5 gap-x-4">
+                    {AGENT_DEFINITIONS.map((agent) => {
+                      const isEnabled =
+                        config.enabledAgents.length === 0 ||
+                        config.enabledAgents.includes(agent.agent_id);
+                      return (
+                        <label
+                          key={agent.agent_id}
+                          className="flex items-center gap-2 cursor-pointer group"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={(e) => {
+                              const allIds = AGENT_DEFINITIONS.map((a) => a.agent_id);
+                              // Start from full list if currently "all enabled"
+                              const current =
+                                config.enabledAgents.length === 0 ? allIds : config.enabledAgents;
+                              const next = e.target.checked
+                                ? [...current, agent.agent_id]
+                                : current.filter((id) => id !== agent.agent_id);
+                              // If all are checked, collapse back to [] (all-enabled shorthand)
+                              updateConfig({
+                                enabledAgents: next.length === allIds.length ? [] : next,
+                              });
+                            }}
+                            className="w-3.5 h-3.5 accent-indigo-500"
+                          />
+                          <span className="text-xs text-slate-500 group-hover:text-slate-300 transition-colors truncate">
+                            {agent.agent_name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* Agents preview */}
-      <section
-        className="mt-10 w-full max-w-5xl"
-        aria-label="Available analysis agents"
-      >
+      {/* Agents preview / Output preview */}
+      <section className="mt-10 w-full max-w-5xl" aria-label="Analysis preview">
         <p className="text-center text-slate-500 text-sm mb-4">
-          {t("home.agents_subtitle")}
+          {spec || architecture ? t("home.agents_subtitle") : "Preview of your analysis output"}
         </p>
-        <ul
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
-          role="list"
-          aria-label="Analysis agents"
-        >
-          {([
-            { name: "Spec Analyst", descKey: "agent.spec_analyst_desc" },
-            { name: "Architecture Validator", descKey: "agent.arch_validator_desc" },
-            { name: "Risk Intelligence", descKey: "agent.risk_intel_desc" },
-            { name: "Business Impact", descKey: "agent.biz_impact_desc" },
-            { name: "Accessibility Advocate", descKey: "agent.access_advocate_desc" },
-            { name: "Delivery Historian", descKey: "agent.delivery_hist_desc" },
-          ] as const).map((agent) => (
-            <li
-              key={agent.name}
-              className="bg-surface-card border border-surface-border rounded-xl p-4"
-            >
-              <div className="font-medium text-sm text-slate-200">{agent.name}</div>
-              <div className="text-xs text-slate-500 mt-0.5">{t(agent.descKey)}</div>
-            </li>
-          ))}
-        </ul>
+
+        {spec || architecture ? (
+          /* Agents grid — shown once the user has started filling in content */
+          <ul
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
+            role="list"
+            aria-label="Analysis agents"
+          >
+            {([
+              { name: "Spec Analyst",           descKey: "agent.spec_analyst_desc"   },
+              { name: "Architecture Validator",  descKey: "agent.arch_validator_desc" },
+              { name: "Risk Intelligence",       descKey: "agent.risk_intel_desc"     },
+              { name: "Business Impact",         descKey: "agent.biz_impact_desc"     },
+              { name: "Accessibility Advocate",  descKey: "agent.access_advocate_desc"},
+              { name: "Delivery Historian",      descKey: "agent.delivery_hist_desc"  },
+            ] as const).map((agent) => (
+              <li key={agent.name} className="bg-surface-card border border-surface-border rounded-xl p-4">
+                <div className="font-medium text-sm text-slate-200">{agent.name}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{t(agent.descKey)}</div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          /* Empty-state visual preview — illustrates what the analysis produces */
+          <div className="animate-fade-in" aria-hidden="true">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Left — agent timeline */}
+              <div className="bg-surface-card border border-surface-border rounded-2xl p-5">
+                <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-4">
+                  Agent Timeline
+                </div>
+                {/* Progress bar */}
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-mono text-slate-600">6/6 complete</span>
+                  <span className="text-[10px] font-mono text-confidence-green">✓ done</span>
+                </div>
+                <div className="h-1 bg-surface-border rounded-full overflow-hidden mb-4">
+                  <div className="h-full w-full bg-accent rounded-full" />
+                </div>
+                {/* Timeline entries */}
+                <ul className="relative space-y-0">
+                  <div className="absolute left-[7px] top-2 bottom-2 w-px bg-surface-border" />
+                  {PREVIEW_AGENTS.map((a) => (
+                    <li key={a.name} className="relative pl-6 pb-3 last:pb-0">
+                      <div className="absolute left-0 top-1 w-3.5 h-3.5 rounded-full border-2 bg-confidence-green border-confidence-green" />
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="text-xs text-slate-400 leading-snug">{a.name}</span>
+                        <span className="text-[9px] font-mono text-slate-600 flex-shrink-0">#{a.rank}</span>
+                      </div>
+                      <div className="flex gap-1 mt-1">
+                        {a.g > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${PREVIEW_BADGE.green}`}>{a.g}✓</span>}
+                        {a.y > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${PREVIEW_BADGE.yellow}`}>{a.y}~</span>}
+                        {a.r > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${PREVIEW_BADGE.red}`}>{a.r}!</span>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Right — sample findings */}
+              <div className="bg-surface-card border border-surface-border rounded-2xl p-5">
+                <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-4">
+                  Findings · 18 total
+                </div>
+                <ul className="space-y-2">
+                  {PREVIEW_FINDINGS.map((f) => (
+                    <li
+                      key={f.title}
+                      className={`relative px-3 py-2.5 rounded-lg border pl-4 overflow-hidden ${
+                        f.level === "red" ? "border-2 border-confidence-red" : `border border-confidence-${f.level}`
+                      }`}
+                    >
+                      {/* Accent strip */}
+                      <div
+                        className={`absolute left-0 top-0 bottom-0 bg-confidence-${f.level} ${f.level === "red" ? "w-1.5" : "w-1"}`}
+                      />
+                      <p className="text-xs text-slate-300 font-medium leading-snug line-clamp-1">{f.title}</p>
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <div className="flex-1 h-1.5 bg-surface-border rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full bg-confidence-${f.level}`}
+                            style={{ width: `${f.score}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs font-bold font-mono tabular-nums ${PREVIEW_TEXT[f.level]}`}>
+                          {f.score}%
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Global score footer */}
+                <div className="mt-4 pt-3 border-t border-surface-border flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-600">Global confidence</span>
+                  <span className="text-sm font-bold font-mono text-confidence-yellow">72%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Fade overlay — signals this is a preview */}
+            <div className="mt-3 flex items-center gap-3 opacity-50">
+              <div className="h-px flex-1 bg-surface-border" />
+              <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">
+                sample output · paste your spec above to begin
+              </span>
+              <div className="h-px flex-1 bg-surface-border" />
+            </div>
+          </div>
+        )}
       </section>
       {/* History */}
       {history.length > 0 && (

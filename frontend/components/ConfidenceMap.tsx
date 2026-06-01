@@ -183,6 +183,16 @@ const CONFIDENCE_DOT: Record<ConfidenceLevel, string> = {
   red: "bg-confidence-red",
 };
 
+const CATEGORY_ICON: Record<string, string> = {
+  risk: "⚠",
+  gap: "∅",
+  ambiguity: "?",
+  contradiction: "⇄",
+  cost: "$",
+  accessibility: "◎",
+  pattern: "⟳",
+};
+
 function FindingNode({ data }: NodeProps) {
   const confidence = data.confidence as ConfidenceLevel;
   const borderClass = CONFIDENCE_BORDER[confidence] ?? "border-surface-border";
@@ -221,6 +231,13 @@ function FindingNode({ data }: NodeProps) {
           </div>
           <span className={`text-xs font-bold font-mono tabular-nums ${textClass}`}>{score}%</span>
         </div>
+        {data.category && (
+          <div className="mt-1.5 flex items-center gap-1" aria-label={`Category: ${data.category}`}>
+            <span className="text-[9px] font-mono text-slate-600 select-none">
+              {CATEGORY_ICON[data.category as string] ?? "·"} {data.category as string}
+            </span>
+          </div>
+        )}
       </div>
     </button>
   );
@@ -343,6 +360,7 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
             label: finding.title,
             confidence: finding.confidence,
             confidence_score: finding.confidence_score,
+            category: finding.category,
             onClick: () => onFindingSelect(finding),
           },
         });
