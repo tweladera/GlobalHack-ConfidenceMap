@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
-  addEdge,
   Node,
   Edge,
   BackgroundVariant,
@@ -24,23 +24,43 @@ import type { AgentState, Finding, ConfidenceLevel } from "@/types";
 function HubNode({ data }: NodeProps) {
   const score = data.globalScore as number | null | undefined;
   const hasScore = score != null;
+  const finalPct = hasScore ? Math.round(score! * 100) : 0;
+
+  const [displayPct, setDisplayPct] = useState(0);
+
+  useEffect(() => {
+    if (!hasScore) { setDisplayPct(0); return; }
+    const duration = 1400;
+    const start = performance.now();
+    let raf: number;
+    const step = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      // ease-out cubic: decelerates as it approaches the target
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayPct(Math.round(eased * finalPct));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [hasScore, finalPct]);
+
   const scoreCol = !hasScore ? "text-accent"
-    : score >= 0.7 ? "text-confidence-green"
-    : score >= 0.45 ? "text-confidence-yellow"
+    : finalPct >= 70 ? "text-confidence-green"
+    : finalPct >= 45 ? "text-confidence-yellow"
     : "text-confidence-red";
 
   return (
     <div
       className="relative flex items-center justify-center w-28 h-28 rounded-full border-2 border-accent bg-accent-dim shadow-lg shadow-accent/20"
       role="img"
-      aria-label={hasScore ? `Analysis hub: global confidence ${Math.round(score! * 100)}%` : `Analysis hub: ${data.label}`}
+      aria-label={hasScore ? `Analysis hub: global confidence ${finalPct}%` : `Analysis hub: ${data.label}`}
     >
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
       <div className="text-center px-2">
         {hasScore ? (
           <>
-            <div className={`text-xl font-bold font-mono tabular-nums leading-none ${scoreCol}`}>
-              {Math.round(score! * 100)}%
+            <div className={`text-xl font-bold font-mono tabular-nums leading-none transition-colors duration-500 ${scoreCol}`}>
+              {displayPct}%
             </div>
             <div className="text-[8px] font-mono text-slate-500 uppercase tracking-widest mt-1">confidence</div>
           </>
@@ -73,6 +93,8 @@ function AgentNode({ data }: NodeProps) {
   const colorClass = STATUS_COLORS[data.status as keyof typeof STATUS_COLORS] ?? STATUS_COLORS.pending;
   const badgeClass = STATUS_BADGE[data.status as keyof typeof STATUS_BADGE] ?? STATUS_BADGE.pending;
   const isRunning = data.status === "running";
+  const isFocused = data.isFocused as boolean | undefined;
+  const isClickable = (data.findingCount as number) > 0;
   const total = (data.greenCount as number) + (data.yellowCount as number) + (data.redCount as number);
   const greenPct = total > 0 ? ((data.greenCount as number) / total) * 100 : 0;
   const yellowPct = total > 0 ? ((data.yellowCount as number) / total) * 100 : 0;
@@ -80,9 +102,17 @@ function AgentNode({ data }: NodeProps) {
 
   return (
     <div
-      className={`relative w-44 bg-surface-card border-2 rounded-xl p-3 transition-all ${colorClass} ${isRunning ? "agent-glow" : ""}`}
-      role="region"
-      aria-label={`Agent: ${data.label}, status: ${data.status}, ${data.findingCount} findings`}
+      onClick={isClickable ? (data.onClick as () => void) : undefined}
+      className={[
+        "relative w-44 bg-surface-card border-2 rounded-xl p-3 transition-all",
+        colorClass,
+        isRunning ? "agent-glow" : "",
+        isClickable ? "cursor-pointer" : "",
+        isFocused ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : "",
+      ].join(" ")}
+      role={isClickable ? "button" : "region"}
+      aria-pressed={isClickable ? isFocused : undefined}
+      aria-label={`${data.label}: ${data.status}, ${data.findingCount} findings${isClickable ? ". Click to focus" : ""}`}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
@@ -153,6 +183,16 @@ const CONFIDENCE_DOT: Record<ConfidenceLevel, string> = {
   red: "bg-confidence-red",
 };
 
+const CATEGORY_ICON: Record<string, string> = {
+  risk: "⚠",
+  gap: "∅",
+  ambiguity: "?",
+  contradiction: "⇄",
+  cost: "$",
+  accessibility: "◎",
+  pattern: "⟳",
+};
+
 function FindingNode({ data }: NodeProps) {
   const confidence = data.confidence as ConfidenceLevel;
   const borderClass = CONFIDENCE_BORDER[confidence] ?? "border-surface-border";
@@ -191,6 +231,13 @@ function FindingNode({ data }: NodeProps) {
           </div>
           <span className={`text-xs font-bold font-mono tabular-nums ${textClass}`}>{score}%</span>
         </div>
+        {data.category && (
+          <div className="mt-1.5 flex items-center gap-1" aria-label={`Category: ${data.category}`}>
+            <span className="text-[9px] font-mono text-slate-600 select-none">
+              {CATEGORY_ICON[data.category as string] ?? "·"} {data.category as string}
+            </span>
+          </div>
+        )}
       </div>
     </button>
   );
@@ -248,8 +295,17 @@ interface ConfidenceMapProps {
 export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: ConfidenceMapProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [mapFilter, setMapFilter] = useState<ConfidenceLevel | "all">("all");
+  const [focusedAgent, setFocusedAgent] = useState<string | null>(null);
+
+  // findingId → confidence (for filter effect)
+  const findingConfidenceRef = useRef<Map<string, ConfidenceLevel>>(new Map());
+  // agentId → Set<findingId> (for focus effect)
+  const agentFindingsRef = useRef<Map<string, Set<string>>>(new Map());
 
   const buildGraph = useCallback(() => {
+    findingConfidenceRef.current = new Map();
+    agentFindingsRef.current = new Map();
     const rawNodes: Node[] = [];
     const rawEdges: Edge[] = [];
 
@@ -266,6 +322,8 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
       const greenCount = agent.findings.filter((f) => f.confidence === "green").length;
       const yellowCount = agent.findings.filter((f) => f.confidence === "yellow").length;
       const redCount = agent.findings.filter((f) => f.confidence === "red").length;
+      const findingIds = new Set(agent.findings.map((f) => f.id));
+      agentFindingsRef.current.set(agent.agent_id, findingIds);
 
       rawNodes.push({
         id: agent.agent_id,
@@ -278,6 +336,8 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
           greenCount,
           yellowCount,
           redCount,
+          isFocused: false,
+          onClick: () => setFocusedAgent((prev) => (prev === agent.agent_id ? null : agent.agent_id)),
         },
       });
 
@@ -291,6 +351,7 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
 
       // Finding nodes
       agent.findings.forEach((finding) => {
+        findingConfidenceRef.current.set(finding.id, finding.confidence);
         rawNodes.push({
           id: finding.id,
           type: "finding",
@@ -299,6 +360,7 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
             label: finding.title,
             confidence: finding.confidence,
             confidence_score: finding.confidence_score,
+            category: finding.category,
             onClick: () => onFindingSelect(finding),
           },
         });
@@ -320,6 +382,86 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
   useEffect(() => {
     buildGraph();
   }, [buildGraph]);
+
+  // Apply confidence filter: dim non-matching finding nodes and their edges
+  useEffect(() => {
+    if (mapFilter === "all") {
+      setNodes((ns) => ns.map((n) => ({ ...n, style: { ...n.style, opacity: 1 } })));
+      setEdges((es) => es.map((e) => ({ ...e, style: { stroke: "#2d2d4e", opacity: 1 } })));
+      return;
+    }
+    setNodes((ns) =>
+      ns.map((n) => {
+        if (n.type !== "finding") return { ...n, style: { ...n.style, opacity: 1 } };
+        const matches = findingConfidenceRef.current.get(n.id) === mapFilter;
+        return { ...n, style: { opacity: matches ? 1 : 0.08 } };
+      })
+    );
+    setEdges((es) =>
+      es.map((e) => {
+        const conf = findingConfidenceRef.current.get(e.target);
+        if (conf == null) return { ...e, style: { stroke: "#2d2d4e", opacity: 1 } };
+        const matches = conf === mapFilter;
+        return { ...e, style: { stroke: matches ? "#4a4a6e" : "#2d2d4e", opacity: matches ? 1 : 0.04 } };
+      })
+    );
+  }, [mapFilter, setNodes, setEdges]);
+
+  // Agent focus mode: dim everything except the focused agent and its findings
+  useEffect(() => {
+    if (focusedAgent === null) {
+      // Clear focus — restore nodes to full opacity and remove isFocused flag
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.type === "agent"
+            ? { ...n, style: { opacity: 1 }, data: { ...n.data, isFocused: false } }
+            : { ...n, style: { opacity: 1 } }
+        )
+      );
+      setEdges((es) => es.map((e) => ({ ...e, style: { stroke: "#2d2d4e", opacity: 1 } })));
+      return;
+    }
+
+    const focusedFindingIds = agentFindingsRef.current.get(focusedAgent) ?? new Set<string>();
+
+    setNodes((ns) =>
+      ns.map((n) => {
+        if (n.id === "hub") return { ...n, style: { opacity: 1 } };
+        if (n.type === "agent") {
+          const isFocused = n.id === focusedAgent;
+          return {
+            ...n,
+            style: { opacity: isFocused ? 1 : 0.2 },
+            data: { ...n.data, isFocused },
+          };
+        }
+        // finding node
+        const inFocus = focusedFindingIds.has(n.id);
+        return { ...n, style: { opacity: inFocus ? 1 : 0.05 } };
+      })
+    );
+    setEdges((es) =>
+      es.map((e) => {
+        const isAgentEdge = e.id.startsWith("hub-");
+        if (isAgentEdge) {
+          const active = e.target === focusedAgent;
+          return { ...e, style: { stroke: active ? "#6366f1" : "#2d2d4e", opacity: active ? 1 : 0.1 } };
+        }
+        // agent → finding edge
+        const inFocus = focusedFindingIds.has(e.target);
+        return { ...e, style: { stroke: inFocus ? "#4a4a6e" : "#2d2d4e", opacity: inFocus ? 1 : 0.04 } };
+      })
+    );
+  }, [focusedAgent, setNodes, setEdges]);
+
+  const filterOptions: { label: string; value: ConfidenceLevel | "all"; color: string }[] = [
+    { label: "All", value: "all", color: "" },
+    { label: "Red", value: "red", color: "bg-confidence-red" },
+    { label: "Yellow", value: "yellow", color: "bg-confidence-yellow" },
+    { label: "Green", value: "green", color: "bg-confidence-green" },
+  ];
+
+  const hasFindings = findingConfidenceRef.current.size > 0;
 
   return (
     <div className="w-full h-full" role="img" aria-label="Confidence map visualization showing agents and their findings">
@@ -350,6 +492,55 @@ export default function ConfidenceMap({ agents, onFindingSelect, globalScore }: 
           }}
           maskColor="#0d0d1a80"
         />
+
+        {/* Top-center panel: confidence filter OR focus mode label */}
+        {hasFindings && (
+          <Panel position="top-center">
+            {focusedAgent ? (
+              /* Focus mode indicator */
+              <div className="flex items-center gap-2 bg-surface-card border border-accent/40 rounded-xl px-3 py-1.5 shadow-lg">
+                <span className="text-[11px] font-mono text-accent">
+                  Focus: {agents.find((a) => a.agent_id === focusedAgent)?.agent_name}
+                </span>
+                <button
+                  onClick={() => setFocusedAgent(null)}
+                  className="text-[11px] font-mono text-slate-500 hover:text-slate-200 transition-colors ml-1"
+                  aria-label="Exit focus mode"
+                >
+                  × exit
+                </button>
+              </div>
+            ) : (
+              /* Confidence filter */
+              <div
+                className="flex items-center gap-1 bg-surface-card border border-surface-border rounded-xl px-2 py-1.5 shadow-lg"
+                role="group"
+                aria-label="Filter findings by confidence level"
+              >
+                {filterOptions.map(({ label, value, color }) => {
+                  const active = mapFilter === value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setMapFilter(value)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all ${
+                        active
+                          ? "bg-surface text-slate-200 shadow-sm"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                      aria-pressed={active}
+                    >
+                      {color && (
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${color}`} aria-hidden="true" />
+                      )}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );

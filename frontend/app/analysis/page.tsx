@@ -12,6 +12,7 @@ import BacklogModal from "@/components/BacklogModal";
 import ChatPanel from "@/components/ChatPanel";
 import { generateMarkdown, downloadMarkdown, exportPdf } from "@/lib/export";
 import { saveAnalysis } from "@/lib/history";
+import { getConfig } from "@/lib/config";
 import type { AgentState, ConsolidatorResult, Finding, SSEEvent } from "@/types";
 import { AGENT_DEFINITIONS } from "@/types";
 import { useI18n } from "@/lib/i18n";
@@ -44,16 +45,20 @@ export default function AnalysisPage() {
   const [globalScore, setGlobalScore] = useState<number | null>(null);
   const [connectionError, setConnectionError] = useState("");
   const [timeoutWarning, setTimeoutWarning] = useState(false);
-  const [showTable, setShowTable] = useState(false);
-  const [textMode, setTextMode] = useState(false);
-  const [showHeatMap, setShowHeatMap] = useState(false);
+  const [enabledAgents] = useState<string[]>(() => getConfig().enabledAgents);
+  const [showTable, setShowTable] = useState(() => getConfig().defaultView === "table");
+  const [textMode, setTextMode] = useState(() => getConfig().defaultView === "text");
+  const [showHeatMap, setShowHeatMap] = useState(() => getConfig().defaultView === "heat");
   const [showBacklog, setShowBacklog] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [completionOrder, setCompletionOrder] = useState<string[]>([]);
   const [isConsolidating, setIsConsolidating] = useState(false);
   const [consolidationResult, setConsolidationResult] = useState<ConsolidatorResult | null>(null);
-  const [hideRedundant, setHideRedundant] = useState(false);
+  const [hideRedundant, setHideRedundant] = useState(() => getConfig().autoHideRedundant);
   const [announcement, setAnnouncement] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,6 +138,9 @@ export default function AnalysisPage() {
           )
         );
         setAllFindings((prev) => [...prev, ...result.findings]);
+        setCompletionOrder((prev) =>
+          prev.includes(event.agent_id!) ? prev : [...prev, event.agent_id!]
+        );
       }
 
       if (event.type === "agent_error" && event.agent_id) {
@@ -218,26 +226,41 @@ export default function AnalysisPage() {
   }, [consolidationResult]);
 
   const displayedFindings = useMemo(() => {
-    if (!hideRedundant || redundantAgentIds.size === 0) return allFindings;
-    return allFindings.filter((f) => !redundantAgentIds.has(f.agent_id));
-  }, [allFindings, hideRedundant, redundantAgentIds]);
+    let findings = allFindings;
+    if (hideRedundant && redundantAgentIds.size > 0) {
+      findings = findings.filter((f) => !redundantAgentIds.has(f.agent_id));
+    }
+    if (enabledAgents.length > 0) {
+      findings = findings.filter((f) => enabledAgents.includes(f.agent_id));
+    }
+    return findings;
+  }, [allFindings, hideRedundant, redundantAgentIds, enabledAgents]);
+
+  const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
+  };
 
   const copyExecutiveSummary = async () => {
     const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
     await navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    showToast("Summary copied to clipboard");
   };
 
   const handleExport = () => {
     const content = generateMarkdown(agents, allFindings, globalScore, confidenceDist);
     downloadMarkdown(content);
     setShowExportMenu(false);
+    showToast("Markdown downloaded");
   };
 
   const handleExportPdf = () => {
     exportPdf(agents, allFindings, globalScore, confidenceDist);
     setShowExportMenu(false);
+    showToast("PDF report opened");
   };
 
   const activeView = textMode ? "text" : showHeatMap ? "heat" : showTable ? "table" : "map";
@@ -444,7 +467,7 @@ export default function AnalysisPage() {
           className="w-64 flex-shrink-0 border-r border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Agent status panel"
         >
-          <AgentStatusCard agents={agents} />
+          <AgentStatusCard agents={agents} completionOrder={completionOrder} />
 
           {/* Summaries per agent */}
           {agents.some((a) => a.summary) && (
@@ -751,6 +774,35 @@ export default function AnalysisPage() {
               <p className="text-xs font-mono text-accent animate-pulse">Cross-agent audit in progress...</p>
               <p className="text-xs text-slate-600">Consolidating findings from all agents</p>
             </div>
+          ) : agents.some((a) => a.status !== "pending") ? (
+            /* Skeleton — agents running, findings not yet arrived */
+            <div
+              className="space-y-2 animate-fade-in"
+              aria-label="Loading findings"
+              aria-busy="true"
+            >
+              <div className="h-2.5 w-28 bg-surface-border rounded animate-pulse mb-4" />
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="px-3 py-3 rounded-lg border border-surface-border space-y-2"
+                  style={{ opacity: 1 - i * 0.16 }}
+                  aria-hidden="true"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="w-2 h-2 rounded-full bg-surface-border animate-pulse mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div
+                        className="h-2.5 bg-surface-border rounded animate-pulse"
+                        style={{ width: `${78 - i * 9}%` }}
+                      />
+                      <div className="h-2 bg-surface-border rounded animate-pulse w-1/4" />
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-surface-border rounded-full animate-pulse" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-slate-600">
               <div className="text-4xl" aria-hidden="true">◎</div>
@@ -910,6 +962,18 @@ export default function AnalysisPage() {
 
       {showBacklog && (
         <BacklogModal findings={allFindings} onClose={() => setShowBacklog(false)} />
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-card border border-confidence-green/40 text-confidence-green text-xs font-mono shadow-xl animate-slide-up"
+        >
+          <span aria-hidden="true">✓</span>
+          {toast}
+        </div>
       )}
 
     </div>
