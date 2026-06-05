@@ -1,0 +1,31 @@
+# Confidence Map — Docker Compose
+#
+# Quick start (demo mode, $0 API cost):
+#   docker compose up
+#
+# Real mode (requires API key):
+#   ANTHROPIC_API_KEY=sk-ant-... docker compose up
+#
+# Frontend: run separately with `make dev` or `pnpm dev` from ./frontend
+# The Next.js dev server proxies /api/* to http://localhost:8000 automatically.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-true}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MODEL: ${MODEL:-claude-sonnet-4-6}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    healthcheck:
+      test: ["CMD", "uv", "run", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

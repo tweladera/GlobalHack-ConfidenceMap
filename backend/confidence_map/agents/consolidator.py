@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, cast
 
@@ -21,6 +22,9 @@ logger = logging.getLogger(__name__)
 AGENT_ID = "consolidator"
 AGENT_NAME = "Consolidator"
 AGENT_ICON = "GitMerge"
+
+_MAX_RETRIES = 2
+_RETRY_BASE_DELAY = 2.0
 
 # ── Tool schema ────────────────────────────────────────────────────────────────
 
@@ -194,21 +198,49 @@ async def run(agent_results: list[AgentResult]) -> ConsolidatorResult:
 
     user_prompt = _USER_TEMPLATE.format(findings_block=findings_block)
 
-    try:
-        response = await client.messages.create(
-            model=settings.model,
-            max_tokens=4096,
-            system=_SYSTEM,
-            messages=[{"role": "user", "content": user_prompt}],
-            tools=[_CONSOLIDATION_TOOL],
-            tool_choice={"type": "any"},
-            timeout=120.0,
-        )
-    except Exception as exc:
-        logger.warning("[consolidator] API call failed: %s — returning empty result.", exc)
-        return ConsolidatorResult(
-            audit_summary=f"Consolidation unavailable: {exc}"
-        )
+    response = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = await client.messages.create(
+                model=settings.model,
+                max_tokens=4096,
+                system=_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+                tools=[_CONSOLIDATION_TOOL],
+                tool_choice={"type": "any"},
+                timeout=120.0,
+            )
+            break
+        except anthropic.RateLimitError:
+            if attempt < _MAX_RETRIES:
+                delay = _RETRY_BASE_DELAY * (2.0**attempt)
+                logger.warning(
+                    "[consolidator] Rate limited; retrying in %.0fs (attempt %d/%d)",
+                    delay, attempt + 1, _MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.warning("[consolidator] Rate limit: all retries exhausted.")
+                return ConsolidatorResult(
+                    audit_summary="Consolidation unavailable: rate limit exhausted."
+                )
+        except anthropic.APIStatusError as exc:
+            if exc.status_code >= 500 and attempt < _MAX_RETRIES:
+                delay = _RETRY_BASE_DELAY * (2.0**attempt)
+                logger.warning(
+                    "[consolidator] Server error %d; retrying in %.0fs (attempt %d/%d)",
+                    exc.status_code, delay, attempt + 1, _MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.warning("[consolidator] API error %d: %s", exc.status_code, exc)
+                return ConsolidatorResult(audit_summary=f"Consolidation unavailable: {exc}")
+        except Exception as exc:
+            logger.warning("[consolidator] API call failed: %s — returning empty result.", exc)
+            return ConsolidatorResult(audit_summary=f"Consolidation unavailable: {exc}")
+
+    if response is None:
+        return ConsolidatorResult(audit_summary="Consolidation unavailable: no response received.")
 
     for block in response.content:
         if block.type == "tool_use" and block.name == "report_consolidation":

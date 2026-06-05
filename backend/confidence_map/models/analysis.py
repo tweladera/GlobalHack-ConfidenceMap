@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class AnalysisRequest(BaseModel):
     """Input for starting a new analysis."""
 
-    spec: str = Field(min_length=10, description="Specification text to analyze")
+    spec: str = Field(min_length=50, description="Specification text to analyze")
     architecture: str = Field(default="", description="Optional architecture description")
     context: str = Field(default="", description="Optional additional context")
 
@@ -17,6 +17,7 @@ class AnalysisStartResponse(BaseModel):
     """Response returned when an analysis is queued."""
 
     analysis_id: str
+    demo_mode: bool = False
 
 
 class ConfidenceDistribution(BaseModel):

@@ -60,6 +60,7 @@ export default function AnalysisPage() {
   const [consolidationResult, setConsolidationResult] = useState<ConsolidatorResult | null>(null);
   const [hideRedundant, setHideRedundant] = useState(() => getConfig().autoHideRedundant);
   const [announcement, setAnnouncement] = useState("");
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,6 +91,10 @@ export default function AnalysisPage() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
+  useEffect(() => {
+    setIsDemoMode(sessionStorage.getItem("demo_mode") === "true");
   }, []);
 
   useEffect(() => {
@@ -291,6 +296,14 @@ export default function AnalysisPage() {
               <div className="w-2 h-2 rounded-full bg-white" />
             </div>
             <span className="text-sm font-semibold text-slate-200">Confidence Map</span>
+            {isDemoMode && (
+              <span
+                className="text-[10px] font-mono font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded"
+                aria-label="Running in demo mode — mock data"
+              >
+                DEMO
+              </span>
+            )}
           </div>
         </div>
 

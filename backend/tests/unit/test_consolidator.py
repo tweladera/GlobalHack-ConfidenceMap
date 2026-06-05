@@ -219,11 +219,86 @@ class TestConsolidatorRun:
         )
         mock_anthropic.return_value = mock_client
 
-        result = await run([_make_result(findings=[_make_finding()])])
+        with patch("confidence_map.agents.consolidator.asyncio.sleep"):
+            result = await run([_make_result(findings=[_make_finding()])])
 
         assert result.contradictions == []
         assert result.confirmed_criticals == []
         assert result.audit_summary != ""
+
+    async def test_retries_on_rate_limit_then_succeeds(
+        self, mock_settings: MagicMock, mock_anthropic: MagicMock
+    ) -> None:
+        from confidence_map.agents.consolidator import run
+
+        tool_block = MagicMock()
+        tool_block.type = "tool_use"
+        tool_block.name = "report_consolidation"
+        tool_block.input = {
+            "contradictions": [],
+            "confirmed_criticals": [],
+            "redundancies": [],
+            "audit_summary": "All clear after retry.",
+        }
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(
+            side_effect=[
+                anthropic.RateLimitError(
+                    message="Too many requests",
+                    response=MagicMock(status_code=429, headers={}),
+                    body={},
+                ),
+                MagicMock(content=[tool_block]),
+            ]
+        )
+        mock_anthropic.return_value = mock_client
+
+        with patch("confidence_map.agents.consolidator.asyncio.sleep"):
+            result = await run([_make_result(findings=[_make_finding()])])
+
+        assert result.audit_summary == "All clear after retry."
+        assert mock_client.messages.create.call_count == 2
+
+    async def test_exhausts_rate_limit_retries(
+        self, mock_settings: MagicMock, mock_anthropic: MagicMock
+    ) -> None:
+        from confidence_map.agents.consolidator import run
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(
+            side_effect=anthropic.RateLimitError(
+                message="Too many requests",
+                response=MagicMock(status_code=429, headers={}),
+                body={},
+            )
+        )
+        mock_anthropic.return_value = mock_client
+
+        with patch("confidence_map.agents.consolidator.asyncio.sleep"):
+            result = await run([_make_result(findings=[_make_finding()])])
+
+        assert "rate limit" in result.audit_summary.lower()
+        assert mock_client.messages.create.call_count == 3  # initial + 2 retries
+
+    async def test_no_retry_on_4xx_error(
+        self, mock_settings: MagicMock, mock_anthropic: MagicMock
+    ) -> None:
+        from confidence_map.agents.consolidator import run
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(
+            side_effect=anthropic.APIStatusError(
+                message="Bad request",
+                response=MagicMock(status_code=400, headers={}),
+                body={},
+            )
+        )
+        mock_anthropic.return_value = mock_client
+
+        result = await run([_make_result(findings=[_make_finding()])])
+
+        assert result.audit_summary != ""
+        assert mock_client.messages.create.call_count == 1  # no retry on 4xx
 
     async def test_returns_error_summary_when_no_tool_block(
         self, mock_settings: MagicMock, mock_anthropic: MagicMock

@@ -68,7 +68,7 @@ class TestStreamMockAnalysis:
         from confidence_map.core.orchestrator import stream_analysis
         from confidence_map.models.analysis import AnalysisRequest
 
-        request = AnalysisRequest(spec="A" * 20)
+        request = AnalysisRequest(spec="A" * 50)
 
         mock_settings = type("S", (), {"demo_mode": True})()
 
@@ -90,7 +90,7 @@ class TestStreamMockAnalysis:
         from confidence_map.core.orchestrator import stream_analysis
         from confidence_map.models.analysis import AnalysisRequest
 
-        request = AnalysisRequest(spec="A" * 20)
+        request = AnalysisRequest(spec="A" * 50)
         mock_settings = type("S", (), {"demo_mode": True})()
 
         with (
@@ -108,7 +108,7 @@ class TestStreamMockAnalysis:
         from confidence_map.core.orchestrator import stream_analysis
         from confidence_map.models.analysis import AnalysisRequest
 
-        request = AnalysisRequest(spec="A" * 20)
+        request = AnalysisRequest(spec="A" * 50)
         mock_settings = type("S", (), {"demo_mode": True})()
 
         with (

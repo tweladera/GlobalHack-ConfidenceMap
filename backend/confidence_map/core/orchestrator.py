@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncGenerator, Coroutine
 from typing import Any, Protocol
 
@@ -145,12 +146,16 @@ async def _stream_mock_analysis() -> AsyncGenerator[SSEEvent, None]:
     )
 
 
-async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, None]:
+async def stream_analysis(
+    request: AnalysisRequest, *, analysis_id: str = ""
+) -> AsyncGenerator[SSEEvent, None]:
     """Orchestrate 6 agents and yield SSE events as each one completes.
 
     Phase 1: Spec Analyst runs alone (its output informs the parallel phase).
     Phase 2: Five remaining agents run concurrently via asyncio.gather.
     """
+    _ctx = f"[orchestrator][{analysis_id}]" if analysis_id else "[orchestrator]"
+
     if get_settings().demo_mode:
         async for mock_event in _stream_mock_analysis():
             yield mock_event
@@ -164,13 +169,13 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         agent_name: str,
         spec_findings: list[Finding] | None = None,
     ) -> AgentResult:
+        t0 = time.monotonic()
         async with semaphore:
             # Semaphore acquired: this agent now has a Claude API slot
-            logger.info("[orchestrator] Putting AGENT_START for %s", agent_id)
+            logger.info("%s AGENT_START %s", _ctx, agent_id)
             await queue.put(
                 SSEEvent(type=SSEEventType.AGENT_START, agent_id=agent_id, agent_name=agent_name)
             )
-            logger.info("[orchestrator] Calling agent %s", agent_id)
             result: AgentResult = await agent_module.run(
                 spec=request.spec,
                 architecture=request.architecture,
@@ -178,7 +183,11 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
                 spec_findings=spec_findings,
             )
         # Semaphore released — next waiting agent can proceed
-        logger.info("[orchestrator] Agent %s done, status=%s", agent_id, result.status)
+        elapsed = time.monotonic() - t0
+        logger.info(
+            "%s AGENT_DONE %s status=%s elapsed=%.1fs findings=%d",
+            _ctx, agent_id, result.status, elapsed, len(result.findings),
+        )
         event_type = (
             SSEEventType.AGENT_COMPLETE
             if result.error is None
@@ -241,7 +250,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
 
         # Phase 3: Consolidator cross-examines all findings
         all_results: list[AgentResult] = [spec_result, *phase2_results]
-        logger.info("[orchestrator] Starting consolidation over %d agent results", len(all_results))
+        logger.info("%s Starting consolidation over %d agent results", _ctx, len(all_results))
         await queue.put(
             SSEEvent(
                 type=SSEEventType.CONSOLIDATION_START,
@@ -251,7 +260,8 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         )
         consolidation_result = await consolidator.run(all_results)
         logger.info(
-            "[orchestrator] Consolidation done: %d criticals, %d contradictions",
+            "%s Consolidation done: criticals=%d contradictions=%d",
+            _ctx,
             len(consolidation_result.confirmed_criticals),
             len(consolidation_result.contradictions),
         )
@@ -266,7 +276,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
         await queue.put(None)  # sentinel
 
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_AGENTS)
-    logger.info("[orchestrator] Starting real-mode analysis, creating orchestrate task")
+    logger.info("%s Starting real-mode analysis", _ctx)
     task = asyncio.create_task(orchestrate())
     dist = ConfidenceDistribution()
     total_findings = 0
@@ -274,11 +284,10 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
 
     try:
         while True:
-            logger.info("[orchestrator] Waiting for next event from queue...")
             event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=130.0)
             if event is None:
                 break
-            logger.info("[orchestrator] Got event: %s", event.type)
+            logger.info("%s event=%s", _ctx, event.type)
 
             if event.type == SSEEventType.AGENT_COMPLETE and event.result:
                 for f in event.result.get("findings", []):
@@ -295,7 +304,7 @@ async def stream_analysis(request: AnalysisRequest) -> AsyncGenerator[SSEEvent, 
             yield event
 
     except TimeoutError:
-        yield SSEEvent(type=SSEEventType.ERROR, error="Analysis timed out after 120 seconds")
+        yield SSEEvent(type=SSEEventType.ERROR, error="Analysis timed out after 130 seconds")
         return
     finally:
         if not task.done():

@@ -36,7 +36,7 @@ def _make_result(scores: list[tuple[float, str]]) -> AgentResult:
 class TestGlobalConfidenceScore:
     async def test_score_is_average_of_all_findings(self) -> None:
         """Global score = average confidence_score across all findings."""
-        request = AnalysisRequest(spec="A" * 20)
+        request = AnalysisRequest(spec="A" * 50)
 
         result = _make_result([(1.0, "green"), (0.5, "yellow"), (0.0, "red")])
         # avg = (1.0 + 0.5 + 0.0) / 3 = 0.5
@@ -75,7 +75,7 @@ class TestGlobalConfidenceScore:
 
     async def test_score_is_none_equivalent_when_no_findings(self) -> None:
         """If all agents return no findings, global score is 0.0."""
-        request = AnalysisRequest(spec="A" * 20)
+        request = AnalysisRequest(spec="A" * 50)
 
         empty_result = AgentResult(
             agent_id="spec_analyst",

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,14 +13,23 @@ from confidence_map.api.chat import router as chat_router
 from confidence_map.core.settings import get_settings
 
 
+def _app_version() -> str:
+    try:
+        return pkg_version("confidence-map")
+    except PackageNotFoundError:
+        return "dev"
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
 
+    _version = _app_version()
+
     app = FastAPI(
         title="Confidence Map API",
         description="AI Architecture & Delivery Intelligence Platform",
-        version="0.1.0",
+        version=_version,
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -35,7 +47,11 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
-        return {"status": "ok", "version": "0.1.0"}
+        return {
+            "status": "ok",
+            "version": _version,
+            "mode": "demo" if settings.demo_mode else "live",
+        }
 
     return app
 

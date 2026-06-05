@@ -15,6 +15,10 @@ from confidence_map.models.chat import ChatRequest
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
+# Cap findings sent to Claude to avoid context overflow on large analyses.
+# Findings are sorted red → yellow → green so critical items are never dropped.
+_MAX_FINDINGS_IN_PROMPT = 20
+
 _DEMO_RESPONSE = (
     "Based on this analysis, here are the key insights.\n\n"
     "The findings reveal a complex risk landscape. Critical items (marked red) "
@@ -33,11 +37,17 @@ _DEMO_RESPONSE = (
 )
 
 
+_CONFIDENCE_PRIORITY: dict[str, int] = {"red": 0, "yellow": 1, "green": 2}
+
+
 def _build_system_prompt(request: ChatRequest) -> str:
+    # Prioritize critical findings; cap to avoid context overflow
+    findings = sorted(request.findings, key=lambda f: _CONFIDENCE_PRIORITY.get(f.confidence, 3))
+    findings = findings[:_MAX_FINDINGS_IN_PROMPT]
     findings_text = "\n".join(
         f"- [{f.confidence.upper()}] {f.title} ({f.agent_name}, {f.category}): "
         f"{f.description} → Action: {f.recommended_action}"
-        for f in request.findings
+        for f in findings
     )
     agent_summaries = "\n".join(
         f"- {a.agent_name}: {a.summary}" for a in request.agents if a.summary
@@ -109,5 +119,5 @@ async def _claude_generator(request: ChatRequest) -> AsyncGenerator[str, None]:
             async for text in stream.text_stream:
                 yield f"data: {json.dumps({'text': text})}\n\n"
         yield 'data: {"type": "complete"}\n\n'
-    except Exception as exc:
+    except anthropic.APIError as exc:
         yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"

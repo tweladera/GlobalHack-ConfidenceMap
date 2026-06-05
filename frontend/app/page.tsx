@@ -114,9 +114,10 @@ function HomePageContent() {
 
       if (!res.ok) throw new Error("Failed to start analysis");
 
-      const { analysis_id } = await res.json();
+      const { analysis_id, demo_mode } = await res.json();
       sessionStorage.setItem("analysis_id", analysis_id);
       sessionStorage.setItem("analysis_spec", spec);
+      sessionStorage.setItem("demo_mode", demo_mode ? "true" : "false");
       router.push("/analysis");
     } catch (e) {
       setError(t("home.error_connect"));

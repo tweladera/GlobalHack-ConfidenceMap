@@ -115,7 +115,7 @@ class TestAnalysisRequest:
             AnalysisRequest(spec="")  # too short
 
     def test_optional_fields_default_to_empty(self) -> None:
-        req = AnalysisRequest(spec="A" * 20)
+        req = AnalysisRequest(spec="A" * 50)
         assert req.architecture == ""
         assert req.context == ""
 
