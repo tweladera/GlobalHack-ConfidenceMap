@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spec-to-Data Pipelines — Confidence Map</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      color: #bfdbfe;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #3b82f6, #60a5fa, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 1rem;
+    }
+
+    /* ── GRID DE CARDS ───────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .icon-blue  { background: #1d3461; }
+    .icon-green { background: #14532d; }
+    .icon-purple{ background: #3b0764; }
+
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+    }
+
+    .card p {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      line-height: 1.7;
+    }
+
+    /* ── SCHEMA BLOCK ───────────────────────────────── */
+    .schema-block {
+      background: #0f172a;
+      border: 1px solid #1e3a5f;
+      border-left: 3px solid #3b82f6;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: #93c5fd;
+      line-height: 1.8;
+    }
+
+    .schema-block .key   { color: #7dd3fc; }
+    .schema-block .value { color: #86efac; }
+    .schema-block .type  { color: #c4b5fd; }
+
+    /* ── DIAGRAM SECTION ───────────────────────────── */
+    .diagram-section {
+      max-width: 1200px;
+      margin: 0 auto 2.5rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 2rem;
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #3b82f6;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #334155;
+    }
+
+    .mermaid { text-align: center; }
+
+    /* ── FILE TABLE ────────────────────────────────── */
+    .files-section {
+      max-width: 1200px;
+      margin: 0 auto 2.5rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+
+    th {
+      background: #0f172a;
+      color: #64748b;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 0.75rem 1.25rem;
+    }
+
+    td {
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid #334155;
+      font-size: 0.875rem;
+      color: #cbd5e1;
+      vertical-align: top;
+    }
+
+    td code {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      background: #0f172a;
+      color: #7dd3fc;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    /* ── FOOTER ────────────────────────────────────── */
+    .footer {
+      text-align: center;
+      color: #334155;
+      font-size: 0.8rem;
+      padding-top: 2rem;
+      border-top: 1px solid #1e293b;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .pill {
+      display: inline-block;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin: 0.2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="badge">Challenge Area 1 of 3</div>
+    <h1 class="title">Spec-to-Data Pipelines</h1>
+    <p class="subtitle">Confidence Map · AI/works™ Hackathon 2026 · Team: Confidence Map</p>
+  </div>
+
+  <!-- CARDS -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-blue">⚠️</div>
+        <span class="card-title">El problema</span>
+      </div>
+      <p>Las especificaciones son texto no estructurado. Los equipos las interpretan, toman decisiones, y ese proceso es invisible, no trazable, y no comparable entre proyectos. Sin datos estructurados, la IA solo puede "hablar sobre" la spec — no razonar sobre ella.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">⚙️</div>
+        <span class="card-title">La solución</span>
+      </div>
+      <p>Cada agente usa Claude tool use con un JSON Schema estricto para transformar texto libre en hallazgos estructurados: nivel de confianza, score numérico, evidencia citada, supuestos explícitos, preguntas abiertas, y acción recomendada.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">📊</div>
+        <span class="card-title">El output</span>
+      </div>
+      <p>Datos Pydantic validados que alimentan el mapa visual, la tabla de decisiones, el Risk Heat Map, el backlog Jira-ready, el export PDF, y el chat de IA — todo desde el mismo pipeline de datos estructurados.</p>
+    </div>
+  </div>
+
+  <!-- SCHEMA -->
+  <div class="diagram-section" style="margin-bottom:1.5rem;">
+    <div class="section-label">🔧 JSON Schema — report_findings tool</div>
+    <div class="schema-block">
+      <span class="key">title</span>           <span class="type">string</span>     <span style="color:#475569">→ título accionable, máx 100 chars</span><br>
+      <span class="key">description</span>     <span class="type">string</span>     <span style="color:#475569">→ explicación detallada del hallazgo</span><br>
+      <span class="key">confidence</span>       <span class="type">enum</span>       <span class="value">"green" | "yellow" | "red"</span><br>
+      <span class="key">confidence_score</span> <span class="type">float</span>     <span style="color:#475569">→ 0.0–1.0 · green:0.6–1.0 · yellow:0.3–0.75 · red:0.0–0.45</span><br>
+      <span class="key">evidence</span>         <span class="type">string</span>     <span style="color:#475569">→ cita textual exacta de la spec</span><br>
+      <span class="key">assumptions</span>      <span class="type">string[]</span>   <span style="color:#475569">→ supuestos explícitos del agente</span><br>
+      <span class="key">needs_validation</span> <span class="type">string[]</span>   <span style="color:#475569">→ preguntas abiertas que el equipo debe validar</span><br>
+      <span class="key">recommended_action</span><span class="type">string</span>     <span style="color:#475569">→ siguiente paso concreto (1–2 frases)</span><br>
+      <span class="key">category</span>         <span class="type">enum</span>       <span class="value">"ambiguity"|"contradiction"|"risk"|"gap"|"accessibility"|"cost"|"pattern"</span>
+    </div>
+  </div>
+
+  <!-- DIAGRAM -->
+  <div class="diagram-section">
+    <div class="section-label">📐 Pipeline completo</div>
+    <div class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {
+  'primaryColor': '#1e293b',
+  'primaryTextColor': '#f1f5f9',
+  'primaryBorderColor': '#3b82f6',
+  'lineColor': '#475569',
+  'secondaryColor': '#0f172a',
+  'tertiaryColor': '#1e3a5f',
+  'edgeLabelBackground': '#1e293b',
+  'clusterBkg': '#0f172a',
+  'clusterBorder': '#334155',
+  'titleColor': '#f1f5f9',
+  'fontFamily': 'Segoe UI, system-ui, sans-serif'
+}}}%%
+flowchart LR
+  classDef input    fill:#1d3461,stroke:#3b82f6,color:#bfdbfe,rx:8
+  classDef agent    fill:#14532d,stroke:#22c55e,color:#86efac,rx:8
+  classDef tool     fill:#312e81,stroke:#818cf8,color:#c7d2fe,rx:8
+  classDef valid    fill:#78350f,stroke:#f59e0b,color:#fde68a,rx:8
+  classDef output   fill:#3b0764,stroke:#a855f7,color:#e9d5ff,rx:8
+  classDef consume  fill:#1e293b,stroke:#475569,color:#94a3b8,rx:8
+
+  subgraph IN["  INPUT — Texto no estructurado  "]
+    A1["📄 PRD / User Stories"]:::input
+    A2["🏗️ Architecture Notes"]:::input
+    A3["🌐 Context / Constraints"]:::input
+  end
+
+  subgraph PHASE1["  FASE 1  "]
+    B1["🔍 Spec Analyst\n(sequential)"]:::agent
+  end
+
+  subgraph PHASE2["  FASE 2 — Paralelo  "]
+    B2["🏛️ Arch Validator"]:::agent
+    B3["🛡️ Risk Intelligence"]:::agent
+    B4["💼 Business Impact"]:::agent
+    B5["♿ Accessibility Advocate"]:::agent
+    B6["📚 Delivery Historian"]:::agent
+  end
+
+  subgraph TOOL["  Claude Tool Use  "]
+    C1["🔧 report_findings\nJSON Schema estricto"]:::tool
+    C2["✅ Pydantic v2\n+ guardrails"]:::valid
+  end
+
+  subgraph OUT["  OUTPUT  "]
+    D1["🟢🟡🔴 Finding\nconfianza · score · evidencia"]:::output
+    D2["📦 AgentResult\nfindings + summary"]:::output
+    D3["📊 Score global\n+ distribución"]:::output
+  end
+
+  subgraph CONSUME["  Consumo Frontend  "]
+    E1["🗺️ Mapa visual"]:::consume
+    E2["📋 Decision Table"]:::consume
+    E3["📄 Export PDF"]:::consume
+    E4["🎫 Backlog Jira"]:::consume
+    E5["💬 AI Chat"]:::consume
+  end
+
+  A1 & A2 & A3 --> B1
+  B1 -->|blackboard| B2 & B3 & B4 & B5 & B6
+  B1 & B2 & B3 & B4 & B5 & B6 --> C1
+  C1 --> C2
+  C2 --> D1 --> D2 --> D3
+  D2 --> E1 & E2 & E3 & E4 & E5
+    </div>
+  </div>
+
+  <!-- FILES -->
+  <div class="files-section">
+    <div class="section-label" style="margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; font-size:.75rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#3b82f6;">
+      📁 Archivos clave
+      <span style="flex:1;height:1px;background:#334155;display:block;"></span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Archivo</th><th>Rol en el pipeline</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>agents/base.py</code></td><td>REPORT_FINDINGS_TOOL · JSON Schema para Claude tool use · _apply_guardrails()</td></tr>
+        <tr><td><code>models/findings.py</code></td><td>Schema Pydantic de Finding y AgentResult</td></tr>
+        <tr><td><code>core/orchestrator.py</code></td><td>Agregación de findings · cálculo del score global</td></tr>
+        <tr><td><code>frontend/types/index.ts</code></td><td>Tipos TypeScript que consumen el output del pipeline</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span class="pill">Confidence Map</span>
+    <span class="pill">AI/works™ Hackathon 2026</span>
+    <span class="pill">Team: Confidence Map</span>
+    <span class="pill">Evans Ladera · Daniel Santibanez</span>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</body>
+</html>
