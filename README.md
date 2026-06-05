@@ -139,7 +139,7 @@ confidence-map/
 │   └── types/index.ts     # Shared TypeScript types
 ├── QUICKSTART.md          # Setup guide (under 10 minutes)
 ├── CHANGELOG.md           # Version history
-└── CLAUDE.md              # AI assistant instructions for this repo
+└── AGENTS.md              # AI assistant instructions for this repo
 ```
 
 ---

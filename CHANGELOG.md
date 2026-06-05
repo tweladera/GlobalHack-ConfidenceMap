@@ -77,7 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Mock findings translated to English (all 6 agents × 4–5 findings each)
 - `README.md` — rewritten in English
 - `QUICKSTART.md` — rewritten in English
-- `CLAUDE.md` — completed with full project context
+- `AGENTS.md` — completed with full project context
 - Preset labels: "NovaBank · Pagos" → "NovaBank · Payments", URL param `?spec=payments`
 
 ### Removed
@@ -96,7 +96,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - `Makefile` with full project orchestration (`make setup/dev/demo/check/test/stop`)
 - `.claude/commands/` — custom Claude Code slash commands (`/check`, `/demo`, `/status`)
-- `CLAUDE.md` — complete project guide for Claude Code
+- `AGENTS.md` — complete project guide for Claude Code
 
 ### Fixed
 - Ruff E501 lint error in `agents/base.py` tool description string

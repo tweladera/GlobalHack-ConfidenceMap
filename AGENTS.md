@@ -4,6 +4,10 @@ Plataforma de inteligencia para arquitectura/delivery con 6 agentes IA especiali
 Analiza especificaciones de software y genera un mapa visual de decisiones, riesgos e
 incertidumbres con niveles de confianza explícitos.
 
+**Repositorio:** https://github.com/tweladera/GlobalHack-ConfidenceMap
+**Equipo:** Confidence Map — Evans Ladera & Daniel Santibanez (Thoughtworks)
+**Hackathon:** AI/works™ 2026 · Nomenclatura: GlobalHack-ConfidenceMap
+
 ---
 
 ## Comandos esenciales
@@ -118,6 +122,8 @@ Sin `DEMO_MODE` (modo real): 60–120 segundos, requiere créditos en la cuenta 
 | `PLAN.md` | Roadmap por fases (Fases 0–5 completas, Fase 6 backlog) |
 | `QUICKSTART.md` | Guía de inicio paso a paso para nuevos colaboradores |
 | `backend/.env.example` | Plantilla de configuración con todas las variables |
+| `docs/submission-ronda1.md` | Documento de entrega Ronda 1 (8–12 junio 2026) |
+| `docs/guion-video-ronda1.md` | Guion completo del video de presentación |
 
 ---
 
