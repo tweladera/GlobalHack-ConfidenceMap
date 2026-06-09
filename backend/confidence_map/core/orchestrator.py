@@ -25,6 +25,8 @@ from confidence_map.models.findings import AgentResult, AgentStatus, Finding
 
 logger = logging.getLogger(__name__)
 
+_AGENT_TIMEOUT = 180.0  # hard Python-level timeout per agent (asyncio cancellation)
+
 
 class _AgentModule(Protocol):
     AGENT_ID: str
@@ -163,8 +165,6 @@ async def stream_analysis(
 
     queue: asyncio.Queue[SSEEvent | None] = asyncio.Queue()
 
-    _AGENT_TIMEOUT = 180.0  # hard Python-level timeout per agent (asyncio cancellation)
-
     async def run(
         agent_module: _AgentModule,
         agent_id: str,
@@ -188,7 +188,7 @@ async def stream_analysis(
                     ),
                     timeout=_AGENT_TIMEOUT,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("%s AGENT_TIMEOUT %s after %.0fs", _ctx, agent_id, _AGENT_TIMEOUT)
                 result = AgentResult(
                     agent_id=agent_id,
