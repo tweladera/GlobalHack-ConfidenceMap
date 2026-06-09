@@ -83,7 +83,10 @@ export function downloadMarkdown(content: string, filename?: string): void {
   const a = document.createElement("a");
   a.href = url;
   a.download = filename ?? `confidence-map-${new Date().toISOString().slice(0, 10)}.md`;
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
@@ -271,11 +274,15 @@ export function exportPdf(
 </body>
 </html>`;
 
-  const win = window.open("", "_blank");
-  if (!win) {
-    alert("Allow popups to export PDF");
-    return;
-  }
-  win.document.write(html);
-  win.document.close();
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

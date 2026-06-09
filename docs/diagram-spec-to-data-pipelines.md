@@ -1,35 +1,35 @@
 # Spec-to-Data Pipelines
-## Diagrama de arquitectura — Confidence Map
+## Architecture diagram — Confidence Map
 
 ---
 
-## Por que se implemento
+## Why it was implemented
 
-Las especificaciones de software (PRDs, historias de usuario, documentos de arquitectura) son texto
-no estructurado. Los equipos las leen, las interpretan, y toman decisiones — pero ese proceso es
-invisible, no trazable, y no comparable entre proyectos.
+Software specifications (PRDs, user stories, architecture documents) are unstructured text.
+Teams read them, interpret them, and make decisions — but that process is
+invisible, untraceable, and not comparable across projects.
 
-El desafio de **Spec-to-Data Pipelines** consiste en transformar ese texto en bruto en datos
-estructurados, accionables y consultables: hallazgos con tipo, nivel de confianza, evidencia,
-supuestos, y acciones recomendadas.
+The **Spec-to-Data Pipelines** challenge consists of transforming that raw text into
+structured, actionable, and queryable data: findings with type, confidence level, evidence,
+assumptions, and recommended actions.
 
-Sin esta transformacion, la IA solo puede "hablar sobre" la especificacion. Con ella, puede
-razonar sobre ella, cuantificarla y hacerla visible para todo el equipo.
+Without this transformation, AI can only "talk about" the specification. With it, it can
+reason about it, quantify it and make it visible to the entire team.
 
 ---
 
-## Como es aplicado en el proyecto
+## How it is applied in the project
 
-### 1. Input: texto no estructurado
+### 1. Input: unstructured text
 
-El usuario ingresa hasta tres tipos de texto:
-- **PRD / Spec**: requisitos funcionales, historias de usuario, criterios de aceptacion
-- **Architecture notes**: decisiones tecnicas, patrones elegidos, dependencias
-- **Context**: restricciones regulatorias, SLAs, integraciones externas
+The user enters up to three types of text:
+- **PRD / Spec**: functional requirements, user stories, acceptance criteria
+- **Architecture notes**: technical decisions, chosen patterns, dependencies
+- **Context**: regulatory constraints, SLAs, external integrations
 
-### 2. Transformacion: Claude tool use con schema Pydantic
+### 2. Transformation: Claude tool use with Pydantic schema
 
-Cada agente recibe el texto y usa la herramienta `report_findings` con un JSON Schema estricto:
+Each agent receives the text and uses the `report_findings` tool with a strict JSON Schema:
 
 ```json
 {
@@ -37,33 +37,33 @@ Cada agente recibe el texto y usa la herramienta `report_findings` con un JSON S
   "description":       "string",
   "confidence":        "green | yellow | red",
   "confidence_score":  "float 0.0-1.0",
-  "evidence":          "cita exacta de la spec",
-  "assumptions":       ["lista de supuestos"],
-  "needs_validation":  ["lista de preguntas abiertas"],
-  "recommended_action":"siguiente paso concreto",
+  "evidence":          "exact quote from the spec",
+  "assumptions":       ["list of assumptions"],
+  "needs_validation":  ["list of open questions"],
+  "recommended_action":"concrete next step",
   "category":          "ambiguity | contradiction | risk | gap | accessibility | cost | pattern"
 }
 ```
 
-### 3. Output: datos estructurados con trazabilidad completa
+### 3. Output: structured data with full traceability
 
-Cada hallazgo es un objeto Pydantic validado con:
-- Nivel de confianza semantico (verde/amarillo/rojo) + score numerico (0.0-1.0)
-- Evidencia: cita textual de la especificacion original
-- Supuestos explicitos que el agente esta haciendo
-- Preguntas abiertas que el equipo debe validar
-- Accion recomendada concreta
+Each finding is a validated Pydantic object with:
+- Semantic confidence level (green/yellow/red) + numeric score (0.0-1.0)
+- Evidence: textual quote from the original specification
+- Explicit assumptions the agent is making
+- Open questions the team must validate
+- Concrete recommended action
 
-### 4. Distribucion y score global
+### 4. Distribution and global score
 
-El orquestador agrega todos los hallazgos y calcula:
-- Distribucion: cuantos verdes, amarillos, rojos
-- Score global de confianza: promedio ponderado de todos los confidence_scores
-- Ese numero aparece en el hub central del mapa visual
+The orchestrator aggregates all findings and calculates:
+- Distribution: how many greens, yellows, reds
+- Global confidence score: weighted average of all confidence_scores
+- That number appears in the central hub of the visual map
 
 ---
 
-## Diagrama
+## Diagram
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': {
@@ -80,41 +80,41 @@ flowchart LR
   classDef output  fill:#3b0764,stroke:#a855f7,color:#e9d5ff
   classDef consume fill:#1e293b,stroke:#475569,color:#94a3b8
 
-  subgraph IN["  INPUT — Texto no estructurado  "]
-    A1["📄 PRD / User Stories"]:::input
-    A2["🏗️ Architecture Notes"]:::input
-    A3["🌐 Context / Constraints"]:::input
+  subgraph IN["  INPUT — Unstructured text  "]
+    A1["PRD / User Stories"]:::input
+    A2["Architecture Notes"]:::input
+    A3["Context / Constraints"]:::input
   end
 
-  subgraph PHASE1["  FASE 1  "]
-    B1["🔍 Spec Analyst\n(sequential)"]:::agent
+  subgraph PHASE1["  PHASE 1  "]
+    B1["Spec Analyst\n(sequential)"]:::agent
   end
 
-  subgraph PHASE2["  FASE 2 — Paralelo  "]
-    B2["🏛️ Arch Validator"]:::agent
-    B3["🛡️ Risk Intelligence"]:::agent
-    B4["💼 Business Impact"]:::agent
-    B5["♿ Accessibility"]:::agent
-    B6["📚 Delivery Historian"]:::agent
+  subgraph PHASE2["  PHASE 2 — Parallel  "]
+    B2["Arch Validator"]:::agent
+    B3["Risk Intelligence"]:::agent
+    B4["Business Impact"]:::agent
+    B5["Accessibility"]:::agent
+    B6["Delivery Historian"]:::agent
   end
 
   subgraph TOOL["  Claude Tool Use  "]
-    C1["🔧 report_findings\nJSON Schema estricto"]:::tool
-    C2["✅ Pydantic v2\n+ guardrails"]:::valid
+    C1["report_findings\nStrict JSON Schema"]:::tool
+    C2["Pydantic v2\n+ guardrails"]:::valid
   end
 
   subgraph OUT["  OUTPUT  "]
-    D1["🟢🟡🔴 Finding\nconfianza · score · evidencia"]:::output
-    D2["📦 AgentResult\nfindings + summary"]:::output
-    D3["📊 Score global\n+ distribución"]:::output
+    D1["Finding\nconfidence · score · evidence"]:::output
+    D2["AgentResult\nfindings + summary"]:::output
+    D3["Global score\n+ distribution"]:::output
   end
 
-  subgraph CONSUME["  Consumo Frontend  "]
-    E1["🗺️ Mapa visual"]:::consume
-    E2["📋 Decision Table"]:::consume
-    E3["📄 Export PDF"]:::consume
-    E4["🎫 Backlog Jira"]:::consume
-    E5["💬 AI Chat"]:::consume
+  subgraph CONSUME["  Frontend consumption  "]
+    E1["Visual map"]:::consume
+    E2["Decision Table"]:::consume
+    E3["Export PDF"]:::consume
+    E4["Jira Backlog"]:::consume
+    E5["AI Chat"]:::consume
   end
 
   A1 & A2 & A3 --> B1
@@ -126,12 +126,12 @@ flowchart LR
 
 ---
 
-## Archivos clave en el proyecto
+## Key files in the project
 
-| Archivo | Rol en el pipeline |
-|---------|-------------------|
-| `backend/confidence_map/models/findings.py` | Schema Pydantic de Finding y AgentResult |
-| `backend/confidence_map/agents/base.py` | `REPORT_FINDINGS_TOOL` — JSON Schema para Claude tool use |
-| `backend/confidence_map/agents/base.py` | `_apply_guardrails()` — validacion post-extraccion |
-| `backend/confidence_map/core/orchestrator.py` | Agregacion de findings y calculo del score global |
-| `frontend/types/index.ts` | Tipos TypeScript que consumen el output del pipeline |
+| File | Role in the pipeline |
+|------|---------------------|
+| `backend/confidence_map/models/findings.py` | Pydantic schema for Finding and AgentResult |
+| `backend/confidence_map/agents/base.py` | `REPORT_FINDINGS_TOOL` — JSON Schema for Claude tool use |
+| `backend/confidence_map/agents/base.py` | `_apply_guardrails()` — post-extraction validation |
+| `backend/confidence_map/core/orchestrator.py` | Findings aggregation and global score calculation |
+| `frontend/types/index.ts` | TypeScript types that consume the pipeline output |

@@ -1,132 +1,150 @@
 # Confidence Map — Backend
 
-API REST con streaming SSE que orquesta seis agentes de IA especializados para analizar especificaciones de software.
+REST API with SSE streaming that orchestrates six specialized AI agents to analyze software specifications.
 
 ---
 
-## Tecnologías
+## Technologies
 
-| Herramienta | Versión | Rol |
-|-------------|---------|-----|
-| Python | 3.12+ | Lenguaje |
-| uv | 0.11+ | Gestión de paquetes |
-| FastAPI | 0.136+ | Framework HTTP |
-| Anthropic SDK | 0.103+ | Integración Claude |
-| Pydantic v2 | 2.13+ | Modelos y validación |
-| mypy | 2.1+ | Tipado estático strict |
-| ruff | 0.15+ | Linter y formatter |
-| pytest | 9.0+ | Tests (cobertura ≥80%) |
+| Tool | Version | Role |
+|------|---------|------|
+| Python | 3.12+ | Language |
+| uv | 0.11+ | Package management |
+| FastAPI | 0.136+ | HTTP framework |
+| Anthropic SDK | 0.103+ | Claude integration |
+| Pydantic v2 | 2.13+ | Models and validation |
+| mypy | 2.1+ | Strict static typing |
+| ruff | 0.15+ | Linter and formatter |
+| pytest | 9.0+ | Tests (coverage >=80%) |
 
 ---
 
-## Estructura del paquete
+## Package structure
 
 ```
 backend/
 ├── confidence_map/
 │   ├── agents/
-│   │   ├── base.py                    # Motor: Claude tool-use estructurado
-│   │   ├── spec_analyst.py            # Agente 1: ambigüedad y gaps
-│   │   ├── arch_validator.py          # Agente 2: arquitectura y drift
-│   │   ├── risk_intelligence.py       # Agente 3: seguridad y delivery
-│   │   ├── business_impact.py         # Agente 4: costo y negocio
-│   │   ├── accessibility_advocate.py  # Agente 5: WCAG 2.1 AA
-│   │   └── delivery_historian.py      # Agente 6: patrones históricos
+│   │   ├── base.py                    # Engine: structured Claude tool-use
+│   │   ├── spec_analyst.py            # Agent 1: ambiguity and gaps
+│   │   ├── arch_validator.py          # Agent 2: architecture and drift
+│   │   ├── risk_intelligence.py       # Agent 3: security and delivery
+│   │   ├── business_impact.py         # Agent 4: cost and business
+│   │   ├── accessibility_advocate.py  # Agent 5: WCAG 2.1 AA
+│   │   └── delivery_historian.py      # Agent 6: historical patterns
 │   ├── api/
-│   │   └── analysis.py                # POST /api/analyze · GET /api/analyze/{id}/stream
+│   │   ├── analysis.py                # POST /api/analyze · GET /api/analyze/{id}/stream
+│   │   └── chat.py                    # POST /api/chat/stream
 │   ├── core/
-│   │   ├── orchestrator.py            # Fase 1 secuencial + Fase 2 paralela
-│   │   └── settings.py                # Variables de entorno (pydantic-settings)
+│   │   ├── orchestrator.py            # Phase 1 sequential + Phase 2 parallel
+│   │   └── settings.py                # Environment variables (pydantic-settings)
 │   ├── models/
 │   │   ├── findings.py                # Finding, AgentResult, ConfidenceLevel
 │   │   ├── analysis.py                # AnalysisRequest, ConfidenceDistribution
-│   │   └── events.py                  # SSEEvent, SSEEventType
-│   └── main.py                        # create_app() + CORS
+│   │   ├── events.py                  # SSEEvent, SSEEventType
+│   │   └── chat.py                    # ChatRequest, ChatResponse
+│   └── main.py                        # FastAPI app entry point + CORS
 ├── tests/
 │   ├── unit/
-│   │   ├── test_models.py             # 14 tests de modelos de dominio
-│   │   └── test_base_agent.py         # 9 tests del motor de agentes
-│   │   ├── test_mock_results.py       # 11 tests del modo demo
-│   │   └── test_orchestrator.py       # 2 tests del orquestador
+│   │   ├── test_models.py             # Domain model tests
+│   │   ├── test_base_agent.py         # Agent engine tests
+│   │   ├── test_mock_results.py       # Demo mode tests
+│   │   ├── test_orchestrator.py       # Orchestrator tests
+│   │   ├── test_chat.py               # Chat endpoint tests
+│   │   └── test_consolidator.py       # Consolidator retry tests
 │   └── integration/
-│       └── test_api.py                # 6 tests de endpoints HTTP
-└── pyproject.toml                     # Toda la configuración
+│       └── test_api.py                # HTTP endpoint tests (SSE end-to-end)
+└── pyproject.toml                     # All configuration
 ```
 
 ---
 
-## Instalación
+## Installation
 
-### Requisitos previos
+### Prerequisites
 - Python 3.12+
-- [uv](https://docs.astral.sh/uv/) instalado
+- [uv](https://docs.astral.sh/uv/) installed
 
-### Instalar dependencias
+### Install dependencies
 
 ```bash
 cd backend
 uv sync
 ```
 
-### Configurar variables de entorno
+### Configure environment variables
 
 ```bash
 cp .env.example .env
-# Editar .env con tu ANTHROPIC_API_KEY
+# Edit .env with your ANTHROPIC_API_KEY
 ```
 
 ---
 
-## Ejecución
+## Running
 
 ```bash
-# Desarrollo (hot reload)
+# Development (hot reload)
 uv run uvicorn confidence_map.main:app --reload
 
-# Producción
+# Production
 uv run uvicorn confidence_map.main:app --host 0.0.0.0 --port 8000
 ```
 
-La API queda disponible en `http://localhost:8000`.
-Documentación interactiva: `http://localhost:8000/docs`
+The API is available at `http://localhost:8000`.
+Interactive docs: `http://localhost:8000/docs`
 
 ---
 
 ## API Reference
 
 ### `POST /api/analyze`
-Inicia un análisis y retorna su ID.
+Starts an analysis and returns its ID.
 
 **Request:**
 ```json
 {
   "spec": "## Feature: Payment Notifications...",
-  "architecture": "Opcional: descripción de arquitectura",
-  "context": "Opcional: contexto adicional"
+  "architecture": "Optional: architecture description",
+  "context": "Optional: additional context"
 }
 ```
 
 **Response `202`:**
 ```json
-{ "analysis_id": "uuid-v4" }
+{ "analysis_id": "uuid-v4", "demo_mode": false }
 ```
 
 ---
 
 ### `GET /api/analyze/{analysis_id}/stream`
-Stream de eventos SSE mientras los agentes analizan.
+SSE event stream while agents analyze.
 
-**Eventos emitidos:**
+**Emitted events:**
 
 ```jsonc
-// Agente inicia
+// Agent starts
 {"type": "agent_start", "agent_id": "spec_analyst", "agent_name": "Spec Analyst"}
 
-// Agente completa
+// Agent completes
 {"type": "agent_complete", "agent_id": "spec_analyst", "result": {...}}
 
-// Análisis finalizado
+// Analysis finished
 {"type": "analysis_complete", "total_findings": 28, "confidence_distribution": {"green": 8, "yellow": 12, "red": 8}}
+```
+
+---
+
+### `POST /api/chat/stream`
+Streams an AI response with full analysis context.
+
+**Request:**
+```json
+{
+  "message": "What is the most critical risk?",
+  "findings": [...],
+  "global_confidence_score": 0.72
+}
 ```
 
 ---
@@ -135,91 +153,94 @@ Stream de eventos SSE mientras los agentes analizan.
 Health check.
 
 ```json
-{"status": "ok", "version": "0.1.0"}
+{"status": "ok", "version": "0.1.0", "mode": "demo"}
 ```
 
 ---
 
-## Flujo de orquestación
+## Orchestration flow
 
 ```
 POST /api/analyze
-        │
-        ▼
-[Spec Analyst]          ← Fase 1: corre solo, establece contexto
-        │
-        ▼
-┌───────────────────────────────────────┐
-│           Fase 2: paralelo            │
-│  [Arch]  [Risk]  [Business]           │
-│  [Accessibility]  [Historian]         │
-└───────────────────────────────────────┘
-        │
-        ▼
+        |
+        v
+[Spec Analyst]          <- Phase 1: runs alone, establishes context
+        |
+        v
++---------------------------------------+
+|           Phase 2: parallel           |
+|  [Arch]  [Risk]  [Business]           |
+|  [Accessibility]  [Historian]         |
++---------------------------------------+
+        |
+        v
+[Consolidator]          <- Phase 3: cross-examines all findings
+        |
+        v
 SSE: analysis_complete
 ```
 
 ---
 
-## Variables de entorno
+## Environment variables
 
-| Variable | Requerida | Default | Descripción |
-|----------|-----------|---------|-------------|
-| `DEMO_MODE` | No | `false` | `true` = resultados pre-generados, sin API |
-| `ANTHROPIC_API_KEY` | Solo si `DEMO_MODE=false` | — | API key de Anthropic |
-| `MODEL` | No | `claude-sonnet-4-6` | Modelo Claude a usar |
-| `FRONTEND_URL` | No | `http://localhost:3000` | Origen permitido en CORS |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DEMO_MODE` | No | `false` | `true` = pre-generated results, no API |
+| `ANTHROPIC_API_KEY` | Only if `DEMO_MODE=false` | — | Anthropic API key |
+| `MODEL` | No | `claude-sonnet-4-6` | Claude model to use |
+| `FRONTEND_URL` | No | `http://localhost:3000` | Allowed origin for CORS |
 
-Para reducir costos en desarrollo, usar `MODEL=claude-haiku-4-5-20251001`.
+To reduce costs in development, use `MODEL=claude-haiku-4-5-20251001`.
 
 ---
 
 ## Quality gates
 
 ```bash
-# Tipado estático estricto
+# Strict static typing
 uv run mypy --strict confidence_map/
 
-# Linting + formato
+# Linting + formatting
 uv run ruff check confidence_map/
 uv run ruff format confidence_map/
 
-# Tests con cobertura
+# Tests with coverage
 ANTHROPIC_API_KEY=test uv run pytest
 
-# Todo junto (pre-commit)
+# All together (pre-commit)
 uv run mypy --strict confidence_map/ && uv run ruff check confidence_map/ && ANTHROPIC_API_KEY=test uv run pytest
 ```
 
 ---
 
-## Cómo funciona cada agente
+## How each agent works
 
-Cada agente usa **Claude tool use** con una herramienta `report_findings` que fuerza output JSON estructurado con niveles de confianza. Esto garantiza que:
+Each agent uses **Claude tool use** with a `report_findings` tool that forces structured JSON output with confidence levels. This guarantees that:
 
-1. El output siempre es parseable (no falla por texto libre)
-2. Los campos `confidence`, `confidence_score`, `evidence` y `assumptions` son siempre explícitos
-3. El `summary` está optimizado para lectores de pantalla
+1. Output is always parseable (no free-text failures)
+2. The `confidence`, `confidence_score`, `evidence` and `assumptions` fields are always explicit
+3. The `summary` is optimized for screen readers
 
 ```python
-# Ejemplo de finding retornado por un agente
+# Example finding returned by an agent
 {
-  "title": "Sin estrategia de retry para el servicio externo",
-  "description": "El spec no define comportamiento cuando el proveedor de email falla",
+  "title": "No retry strategy for external service",
+  "description": "The spec does not define behavior when the email provider fails",
   "confidence": "red",
   "confidence_score": 0.1,
-  "evidence": "La historia US-001 no menciona manejo de errores del proveedor",
+  "evidence": "User story US-001 does not mention error handling for the provider",
   "assumptions": [],
-  "needs_validation": ["¿Cuál es la política de retry?", "¿Hay circuit breaker?"],
+  "needs_validation": ["What is the retry policy?", "Is there a circuit breaker?"],
   "category": "risk"
 }
 ```
 
 ---
 
-## Agregar un nuevo agente
+## Adding a new agent
 
-1. Crear `confidence_map/agents/mi_agente.py` con `AGENT_ID`, `AGENT_NAME`, `AGENT_ICON` y `async def run(...) -> AgentResult`
-2. Importar en `confidence_map/agents/__init__.py`
-3. Agregar al `orchestrate()` en `confidence_map/core/orchestrator.py`
-4. Escribir tests en `tests/unit/`
+1. Create `confidence_map/agents/my_agent.py` with `AGENT_ID`, `AGENT_NAME`, `AGENT_ICON` and `async def run(...) -> AgentResult`
+2. Import in `confidence_map/agents/__init__.py`
+3. Add to `orchestrate()` in `confidence_map/core/orchestrator.py`
+4. Write tests in `tests/unit/`

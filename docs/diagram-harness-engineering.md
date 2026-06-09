@@ -1,96 +1,96 @@
 # Harness Engineering
-## Diagrama de arquitectura — Confidence Map
+## Architecture diagram — Confidence Map
 
 ---
 
-## Por que se implemento
+## Why it was implemented
 
-Los agentes de IA fallan de formas predecibles: se exceden en el uso de la API, generan output
-mal formado, producen resultados inconsistentes bajo presion de rate limits, o simplemente
-"alucina" con evidencia vaga. Sin un harness, estos fallos se propagan silenciosamente al usuario.
+AI agents fail in predictable ways: they exceed API usage, generate malformed output,
+produce inconsistent results under rate limit pressure, or simply "hallucinate" with vague
+evidence. Without a harness, these failures propagate silently to the user.
 
-El **harness** es el scaffolding arquitectonico que rodea a los agentes y garantiza que:
-- Los errores se capturan y aislan sin romper el flujo completo
-- El output de cada agente se valida antes de ser consumido
-- Los recursos de API se distribuyen de forma justa entre agentes paralelos
-- Los fallos transitorios (rate limits, errores 5xx) se recuperan automaticamente
-- El usuario recibe feedback en tiempo real mientras los agentes trabajan
+The **harness** is the architectural scaffolding that surrounds the agents and ensures that:
+- Errors are captured and isolated without breaking the full flow
+- Each agent's output is validated before being consumed
+- API resources are distributed fairly among parallel agents
+- Transient failures (rate limits, 5xx errors) are automatically recovered
+- The user receives real-time feedback while the agents work
 
-Referencia: [Anthropic Engineering — Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps)
+Reference: [Anthropic Engineering — Harness Design for Long-Running Apps](https://www.anthropic.com/engineering/harness-design-long-running-apps)
 
 ---
 
-## Como es aplicado en el proyecto
+## How it is applied in the project
 
-### Componentes del harness
+### Harness components
 
-#### 1. Orquestacion en fases (Phase-based orchestration)
+#### 1. Phase-based orchestration
 
 ```
-Fase 1: Spec Analyst        (sequential — su output informa las demas fases)
-         ↓ blackboard
-Fase 2: 5 agentes           (parallel — asyncio.gather con semaforo)
-         ↓ all results
-Fase 3: Consolidator        (sequential — cross-examina todos los findings)
-         ↓ sentinel
-Fase 4: Score global        (agregacion — promedio ponderado de confidence_scores)
+Phase 1: Spec Analyst        (sequential — its output informs subsequent phases)
+         v blackboard
+Phase 2: 5 agents            (parallel — asyncio.gather with semaphore)
+         v all results
+Phase 3: Consolidator        (sequential — cross-examines all findings)
+         v sentinel
+Phase 4: Global score        (aggregation — weighted average of confidence_scores)
 ```
 
-#### 2. Semaforo de concurrencia
+#### 2. Concurrency semaphore
 
-`asyncio.Semaphore(3)` — maximo 3 agentes llamando a Claude simultaneamente.
-Evita saturar rate limits cuando 5 agentes intentan ejecutarse en paralelo.
-El cuarto y quinto agente esperan en cola hasta que un slot se libera.
+`asyncio.Semaphore(3)` — maximum 3 agents calling Claude simultaneously.
+Prevents saturating rate limits when 5 agents attempt to run in parallel.
+The fourth and fifth agents wait in queue until a slot is freed.
 
-#### 3. Retry policy con exponential backoff
+#### 3. Retry policy with exponential backoff
 
 ```python
 MAX_RETRIES = 2
 BASE_DELAY  = 2.0s
-# Delays: 2s → 4s → falla definitiva
+# Delays: 2s -> 4s -> definitive failure
 ```
-Cubre: `RateLimitError`, `APIStatusError` (5xx).
-No reintenta errores 4xx (son errores del cliente, no del servidor).
+Covers: `RateLimitError`, `APIStatusError` (5xx).
+Does not retry 4xx errors (those are client errors, not server errors).
 
-#### 4. Guardrails de calidad de output
+#### 4. Output quality guardrails
 
-Despues de cada llamada Claude, `_apply_guardrails()` valida:
-- **Score-level alignment**: el confidence_score debe caer en el rango de su nivel
+After each Claude call, `_apply_guardrails()` validates:
+- **Score-level alignment**: the confidence_score must fall within its level's range
   - green: 0.60-1.00 | yellow: 0.30-0.75 | red: 0.00-0.45
-  - Si no: se clampea al rango correcto + warning en logs
-- **Evidence vacia**: si el agente omite la cita, se sustituye un placeholder
-- **All-green distribution**: si todos los findings son verdes en un resultado multi-finding, se loguea un warning de posible bajo analisis
+  - If not: clamped to the correct range + warning in logs
+- **Empty evidence**: if the agent omits the citation, a placeholder is substituted
+- **All-green distribution**: if all findings are green in a multi-finding result, a warning of possible shallow analysis is logged
 
 #### 5. Error isolation
 
-`call_agent()` siempre retorna `AgentResult`, nunca lanza excepcion.
-Los errores quedan en `result.error` y `result.status = ERROR`.
-El orquestador continua con los demas agentes aunque uno falle.
+`call_agent()` always returns `AgentResult`, never raises an exception.
+Errors are stored in `result.error` and `result.status = ERROR`.
+The orchestrator continues with the remaining agents even if one fails.
 
 #### 6. SSE streaming (real-time feedback)
 
-El harness emite eventos SSE a medida que cada agente completa:
-- `AGENT_START`: el agente comenzo
-- `AGENT_COMPLETE` / `AGENT_ERROR`: el agente termino con resultado o error
-- `CONSOLIDATION_START` / `CONSOLIDATION_COMPLETE`: el meta-juez actuo
-- `ANALYSIS_COMPLETE`: score global + distribucion final
-- Timeout: si un evento no llega en 130s, el harness emite un error
+The harness emits SSE events as each agent completes:
+- `AGENT_START`: the agent started
+- `AGENT_COMPLETE` / `AGENT_ERROR`: the agent finished with a result or error
+- `CONSOLIDATION_START` / `CONSOLIDATION_COMPLETE`: the meta-judge acted
+- `ANALYSIS_COMPLETE`: global score + final distribution
+- Timeout: if an event does not arrive within 130s, the harness emits an error
 
-#### 7. Blackboard compartido (Shared Blackboard pattern)
+#### 7. Shared Blackboard pattern
 
-Los findings del Spec Analyst (Fase 1) se formatean como XML y se pasan a los 5 agentes de
-Fase 2. Esto evita que cada agente redescubra los mismos problemas y los orienta a razonar
-desde su dominio especifico.
+The Spec Analyst findings (Phase 1) are formatted as XML and passed to the 5 Phase 2 agents.
+This prevents each agent from rediscovering the same problems and directs them to reason
+from their specific domain.
 
 #### 8. DEMO_MODE (Test harness)
 
-Con `DEMO_MODE=true`, el harness usa resultados pre-generados con delays simulados.
-El flujo SSE es identico al modo real — sin consumir creditos de API.
-Permite validar la arquitectura completa a $0 de costo.
+With `DEMO_MODE=true`, the harness uses pre-generated results with simulated delays.
+The SSE flow is identical to real mode — without consuming API credits.
+Allows validating the full architecture at $0 cost.
 
 ---
 
-## Diagrama
+## Diagram
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': {
@@ -109,41 +109,41 @@ flowchart TD
   classDef guard   fill:#422006,stroke:#eab308,color:#fde68a
   classDef err     fill:#450a0a,stroke:#ef4444,color:#fca5a5
 
-  REQ["📨 AnalysisRequest\nspec · architecture · context"]:::req
+  REQ["AnalysisRequest\nspec · architecture · context"]:::req
 
-  subgraph HARNESS["🔧 HARNESS — orchestrator.py"]
-    subgraph P1["FASE 1 — Sequential"]
-      SA["🔍 Spec Analyst\ncall_agent()"]:::phase1
-      BB["📋 Shared Blackboard\nformat_spec_findings() → XML"]:::harness
+  subgraph HARNESS["HARNESS — orchestrator.py"]
+    subgraph P1["PHASE 1 — Sequential"]
+      SA["Spec Analyst\ncall_agent()"]:::phase1
+      BB["Shared Blackboard\nformat_spec_findings() -> XML"]:::harness
     end
-    subgraph SEM["🚦 Semaphore(3) — max 3 concurrent"]
-      subgraph P2["FASE 2 — asyncio.gather"]
-        A1["🏛️ Arch Validator"]:::phase2
-        A2["🛡️ Risk Intelligence"]:::phase2
-        A3["💼 Business Impact"]:::phase2
-        A4["♿ Accessibility"]:::phase2
-        A5["📚 Delivery Historian"]:::phase2
+    subgraph SEM["Semaphore(3) — max 3 concurrent"]
+      subgraph P2["PHASE 2 — asyncio.gather"]
+        A1["Arch Validator"]:::phase2
+        A2["Risk Intelligence"]:::phase2
+        A3["Business Impact"]:::phase2
+        A4["Accessibility"]:::phase2
+        A5["Delivery Historian"]:::phase2
       end
     end
-    subgraph P3["FASE 3 — Sequential"]
-      CON["🧑‍⚖️ Consolidator\nMeta-juez · cross-examina findings"]:::phase3
+    subgraph P3["PHASE 3 — Sequential"]
+      CON["Consolidator\nMeta-judge · cross-examines findings"]:::phase3
     end
-    SCORE["📊 Score global\navg(confidence_scores) · distribución"]:::harness
+    SCORE["Global score\navg(confidence_scores) · distribution"]:::harness
   end
 
-  subgraph BASE["⚙️ BASE AGENT — base.py"]
+  subgraph BASE["BASE AGENT — base.py"]
     API["Claude Sonnet 4.6\nreport_findings tool"]:::phase1
-    RETRY["🔁 Retry + backoff\n2s → 4s · MAX 2 reintentos"]:::harness
-    GUARD["✅ _apply_guardrails()\nscore · evidence · all-green"]:::guard
-    ISO["🛡️ Error isolation\nsiempre retorna AgentResult"]:::err
+    RETRY["Retry + backoff\n2s -> 4s · MAX 2 retries"]:::harness
+    GUARD["_apply_guardrails()\nscore · evidence · all-green"]:::guard
+    ISO["Error isolation\nalways returns AgentResult"]:::err
   end
 
-  subgraph SSE["📡 SSE STREAMING"]
+  subgraph SSE["SSE STREAMING"]
     E1["AGENT_START"]:::sse
     E2["AGENT_COMPLETE / ERROR"]:::sse
     E3["CONSOLIDATION_COMPLETE"]:::sse
     E4["ANALYSIS_COMPLETE + score"]:::sse
-    TO["⏱️ Timeout 130s → ERROR"]:::err
+    TO["Timeout 130s -> ERROR"]:::err
   end
 
   REQ --> SA
@@ -161,31 +161,31 @@ flowchart TD
 
 ---
 
-## Comparacion con el patron Anthropic
+## Comparison with the Anthropic pattern
 
-| Patron Anthropic (long-running) | Implementacion en Confidence Map |
-|--------------------------------|----------------------------------|
-| Multi-agent specialization | 6 agentes + consolidador con dominios separados |
-| External evaluation (Evaluator) | Consolidator: agente separado que juzga el output de todos |
-| Structured artifacts | Blackboard XML pasado entre fases |
-| Guardrails de calidad | `_apply_guardrails()`: score, evidence, distribucion |
+| Anthropic pattern (long-running) | Implementation in Confidence Map |
+|----------------------------------|----------------------------------|
+| Multi-agent specialization | 6 agents + consolidator with separate domains |
+| External evaluation (Evaluator) | Consolidator: separate agent that judges all agents' output |
+| Structured artifacts | XML Blackboard passed between phases |
+| Output quality guardrails | `_apply_guardrails()`: score, evidence, distribution |
 | Rate limiting | `asyncio.Semaphore(3)` |
-| Retry + backoff | `_make_api_call()` con exponential backoff |
-| Error isolation | `call_agent()` nunca lanza — siempre retorna resultado |
-| Environmental continuity | SSE streaming: el usuario ve el progreso en tiempo real |
-| Test harness | `DEMO_MODE=true` con mock results identicos en estructura |
-| Context reset | No aplica: cada agente es una sola llamada (no multi-turno) |
-| Feature registry | No aplica: analisis atomico, no multi-sesion |
+| Retry + backoff | `_make_api_call()` with exponential backoff |
+| Error isolation | `call_agent()` never raises — always returns result |
+| Environmental continuity | SSE streaming: the user sees progress in real time |
+| Test harness | `DEMO_MODE=true` with mock results identical in structure |
+| Context reset | Not applicable: each agent is a single call (not multi-turn) |
+| Feature registry | Not applicable: atomic analysis, not multi-session |
 
 ---
 
-## Archivos clave en el proyecto
+## Key files in the project
 
-| Archivo | Componente del harness |
-|---------|----------------------|
-| `backend/confidence_map/core/orchestrator.py` | Orquestacion en fases, semaforo, SSE queue, timeout, score global |
+| File | Harness component |
+|------|------------------|
+| `backend/confidence_map/core/orchestrator.py` | Phase orchestration, semaphore, SSE queue, timeout, global score |
 | `backend/confidence_map/agents/base.py` | `_make_api_call()` retry, `_apply_guardrails()`, `call_agent()` error isolation |
 | `backend/confidence_map/agents/base.py` | `format_spec_findings()` shared blackboard |
 | `backend/confidence_map/core/mock_results.py` | DEMO_MODE test harness |
 | `backend/confidence_map/core/settings.py` | `DEMO_MODE`, `MODEL`, `ENABLE_THINKING`, `THINKING_BUDGET_TOKENS` |
-| `backend/confidence_map/api/analysis.py` | SSE endpoint — consume los eventos del harness |
+| `backend/confidence_map/api/analysis.py` | SSE endpoint — consumes events from the harness |

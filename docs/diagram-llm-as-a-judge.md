@@ -1,60 +1,60 @@
 # LLM-as-a-Judge
-## Diagrama de arquitectura — Confidence Map
+## Architecture diagram — Confidence Map
 
 ---
 
-## Por que se implemento
+## Why it was implemented
 
-Los modelos de lenguaje tienen un problema conocido de auto-evaluacion: cuando se les pide que
-revisen su propio trabajo, tienden a validarlo en lugar de criticarlo. La solucion es la misma que
-en ingenieria humana: separar quien hace el trabajo de quien lo juzga.
+Language models have a known self-evaluation problem: when asked to review their own work,
+they tend to validate it rather than criticize it. The solution is the same as in human
+engineering: separate who does the work from who judges it.
 
-El patron **LLM-as-a-Judge** aplica este principio a la evaluacion de especificaciones: en lugar
-de usar un solo modelo que analice todo, se usan multiples agentes especializados que actuan como
-jueces independientes, cada uno desde su dominio de expertise.
+The **LLM-as-a-Judge** pattern applies this principle to specification evaluation: instead
+of using a single model that analyzes everything, multiple specialized agents are used that
+act as independent judges, each from their own domain of expertise.
 
-El resultado es un sistema de evaluacion mas robusto, con menor sesgo, y con veredictos trazables
-que muestran en que evidencia se basa cada juicio.
-
----
-
-## Como es aplicado en el proyecto
-
-### 6 jueces especializados — dominios independientes
-
-Cada agente es un LLM (Claude Sonnet 4.6) con un system prompt especializado que lo posiciona
-como experto en un dominio especifico. Ninguno sabe lo que los otros estan evaluando.
-
-| Agente | Dominio | Que juzga |
-|--------|---------|-----------|
-| **Spec Analyst** | Requisitos | Ambiguedad, contradicciones, requisitos faltantes |
-| **Architecture Validator** | Arquitectura | Acoplamiento peligroso, SLAs imposibles, patrones inadecuados |
-| **Risk Intelligence** | Seguridad / Ops | Gaps de seguridad, compliance, observabilidad |
-| **Business Impact** | Negocio | Costos ocultos, impacto en revenue, decisiones irreversibles |
-| **Accessibility Advocate** | Accesibilidad | WCAG 2.1 AA, inclusion, barreras para usuarios con discapacidad |
-| **Delivery Historian** | Historia | Incidentes similares en el pasado, patrones de fallo conocidos |
-
-### El veredicto de cada juez
-
-Cada agente emite hallazgos con estructura de veredicto explicito:
-- **Nivel**: green (claro), yellow (inferido), red (critico / faltante)
-- **Score**: numero 0.0-1.0 que cuantifica la certeza del juicio
-- **Evidencia**: cita textual de la spec que respalda el veredicto
-- **Supuestos**: lo que el juez esta asumiendo para llegar a ese juicio
-- **Preguntas abiertas**: lo que el juez no puede determinar sin mas informacion
-
-### El meta-juez: Consolidator
-
-En la Fase 3, un septimo agente (Consolidator) recibe todos los hallazgos de los 6 jueces y:
-- Identifica criticos confirmados (multiples jueces coinciden)
-- Detecta contradicciones entre jueces
-- Genera recomendaciones de prioridad cruzada
-
-Este es el patron "Evaluator" de Anthropic: un agente separado que juzga el output de los otros.
+The result is a more robust evaluation system, with less bias, and with traceable verdicts
+that show what evidence each judgment is based on.
 
 ---
 
-## Diagrama
+## How it is applied in the project
+
+### 6 specialized judges — independent domains
+
+Each agent is an LLM (Claude Sonnet 4.6) with a specialized system prompt that positions it
+as an expert in a specific domain. None knows what the others are evaluating.
+
+| Agent | Domain | What it judges |
+|-------|--------|---------------|
+| **Spec Analyst** | Requirements | Ambiguity, contradictions, missing requirements |
+| **Architecture Validator** | Architecture | Dangerous coupling, impossible SLAs, inadequate patterns |
+| **Risk Intelligence** | Security / Ops | Security gaps, compliance, observability |
+| **Business Impact** | Business | Hidden costs, revenue impact, irreversible decisions |
+| **Accessibility Advocate** | Accessibility | WCAG 2.1 AA, inclusion, barriers for users with disabilities |
+| **Delivery Historian** | History | Similar past incidents, known failure patterns |
+
+### The verdict of each judge
+
+Each agent emits findings with explicit verdict structure:
+- **Level**: green (clear), yellow (inferred), red (critical / missing)
+- **Score**: number 0.0-1.0 that quantifies the certainty of the judgment
+- **Evidence**: textual quote from the spec that supports the verdict
+- **Assumptions**: what the judge is assuming to reach that judgment
+- **Open questions**: what the judge cannot determine without more information
+
+### The meta-judge: Consolidator
+
+In Phase 3, a seventh agent (Consolidator) receives all findings from the 6 judges and:
+- Identifies confirmed criticals (multiple judges agree)
+- Detects contradictions between judges
+- Generates cross-priority recommendations
+
+This is Anthropic's "Evaluator" pattern: a separate agent that judges the output of the others.
+
+---
+
+## Diagram
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': {
@@ -70,32 +70,32 @@ flowchart TD
   classDef meta    fill:#14532d,stroke:#22c55e,color:#86efac
   classDef output  fill:#78350f,stroke:#f59e0b,color:#fde68a
 
-  SPEC["📄 Especificación\nPRD · Architecture · Context"]:::spec
+  SPEC["Specification\nPRD · Architecture · Context"]:::spec
 
-  subgraph FASE1["⬛ FASE 1 — Juez inicial"]
-    J0["🔍 Spec Analyst\nAmbigüedad · Contradicciones · Gaps"]:::judge
-    BB["📋 Shared Blackboard\nXML con findings iniciales"]:::verdict
+  subgraph PHASE1["PHASE 1 — Initial judge"]
+    J0["Spec Analyst\nAmbiguity · Contradictions · Gaps"]:::judge
+    BB["Shared Blackboard\nXML with initial findings"]:::verdict
   end
 
-  subgraph FASE2["⬛ FASE 2 — Jueces especializados (paralelo)"]
-    J1["🏛️ Architecture Validator\nSLA · acoplamiento · patrones"]:::judge
-    J2["🛡️ Risk Intelligence\nseguridad · compliance · ops"]:::judge
-    J3["💼 Business Impact\ncostos · revenue · decisiones"]:::judge
-    J4["♿ Accessibility Advocate\nWCAG 2.1 AA · inclusión"]:::judge
-    J5["📚 Delivery Historian\nincidentes históricos · patrones"]:::judge
+  subgraph PHASE2["PHASE 2 — Specialized judges (parallel)"]
+    J1["Architecture Validator\nSLA · coupling · patterns"]:::judge
+    J2["Risk Intelligence\nsecurity · compliance · ops"]:::judge
+    J3["Business Impact\ncosts · revenue · decisions"]:::judge
+    J4["Accessibility Advocate\nWCAG 2.1 AA · inclusion"]:::judge
+    J5["Delivery Historian\nhistorical incidents · patterns"]:::judge
   end
 
-  subgraph VEREDICTO["📋 Veredicto por juez"]
-    V["🟢🟡🔴 confidence: green|yellow|red\n📊 confidence_score: 0.0–1.0\n📌 evidence: cita textual\n💭 assumptions: supuestos\n❓ needs_validation: dudas\n⚡ recommended_action"]:::verdict
+  subgraph VERDICT["Verdict per judge"]
+    V["green|yellow|red confidence\nconfidence_score: 0.0-1.0\nevidence: textual quote\nassumptions\nneeds_validation: open questions\nrecommended_action"]:::verdict
   end
 
-  subgraph FASE3["⬛ FASE 3 — Meta-juez (Evaluator pattern)"]
-    C["🧑‍⚖️ Consolidator\nCross-examina todos los veredictos\nCríticos confirmados · Contradicciones · Prioridades"]:::meta
+  subgraph PHASE3["PHASE 3 — Meta-judge (Evaluator pattern)"]
+    C["Consolidator\nCross-examines all verdicts\nConfirmed criticals · Contradictions · Priorities"]:::meta
   end
 
-  O1["🗺️ Confidence Map\nverde · amarillo · rojo"]:::output
-  O2["📊 Score global"]:::output
-  O3["⚡ Críticos confirmados"]:::output
+  O1["Confidence Map\ngreen · yellow · red"]:::output
+  O2["Global score"]:::output
+  O3["Confirmed criticals"]:::output
 
   SPEC --> J0
   J0 --> BB
@@ -108,28 +108,28 @@ flowchart TD
 
 ---
 
-## Diferencia clave con un chatbot
+## Key difference from a chatbot
 
 | Chatbot / Copilot | Confidence Map (LLM-as-a-Judge) |
 |------------------|--------------------------------|
-| Un modelo responde | 7 agentes evaluan de forma independiente |
-| La respuesta no tiene nivel de certeza | Cada hallazgo tiene confidence level + score numerico |
-| No muestra en que se basa | Evidencia: cita textual obligatoria |
-| No dice que esta asumiendo | Supuestos explicitos en cada veredicto |
-| No sabe lo que no sabe | `needs_validation`: lista de dudas abiertas |
-| Un punto de vista | Multiples dominios, posibles contradicciones entre jueces |
+| One model responds | 7 agents evaluate independently |
+| The response has no certainty level | Each finding has a confidence level + numeric score |
+| Does not show what it is based on | Evidence: mandatory textual quote |
+| Does not say what it is assuming | Explicit assumptions in every verdict |
+| Does not know what it doesn't know | `needs_validation`: list of open questions |
+| One point of view | Multiple domains, possible contradictions between judges |
 
 ---
 
-## Archivos clave en el proyecto
+## Key files in the project
 
-| Archivo | Rol en LLM-as-a-Judge |
-|---------|----------------------|
-| `backend/confidence_map/agents/spec_analyst.py` | Juez de requisitos — Fase 1 |
-| `backend/confidence_map/agents/arch_validator.py` | Juez de arquitectura |
-| `backend/confidence_map/agents/risk_intelligence.py` | Juez de seguridad y riesgos |
-| `backend/confidence_map/agents/business_impact.py` | Juez de impacto de negocio |
-| `backend/confidence_map/agents/accessibility_advocate.py` | Juez de accesibilidad WCAG 2.1 AA |
-| `backend/confidence_map/agents/delivery_historian.py` | Juez historico de delivery |
-| `backend/confidence_map/agents/consolidator.py` | Meta-juez — Fase 3 |
-| `backend/confidence_map/agents/base.py` | `format_spec_findings()` — blackboard compartido |
+| File | Role in LLM-as-a-Judge |
+|------|----------------------|
+| `backend/confidence_map/agents/spec_analyst.py` | Requirements judge — Phase 1 |
+| `backend/confidence_map/agents/arch_validator.py` | Architecture judge |
+| `backend/confidence_map/agents/risk_intelligence.py` | Security and risk judge |
+| `backend/confidence_map/agents/business_impact.py` | Business impact judge |
+| `backend/confidence_map/agents/accessibility_advocate.py` | WCAG 2.1 AA accessibility judge |
+| `backend/confidence_map/agents/delivery_historian.py` | Historical delivery judge |
+| `backend/confidence_map/agents/consolidator.py` | Meta-judge — Phase 3 |
+| `backend/confidence_map/agents/base.py` | `format_spec_findings()` — shared blackboard |

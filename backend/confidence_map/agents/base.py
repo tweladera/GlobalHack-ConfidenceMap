@@ -242,7 +242,7 @@ async def _make_api_call(
                     messages=[{"role": "user", "content": user_prompt}],
                     tools=[REPORT_FINDINGS_TOOL],
                     tool_choice={"type": "any"},
-                    timeout=120.0,
+                    timeout=80.0,
                 )
             return response
         except anthropic.RateLimitError:
@@ -293,35 +293,55 @@ async def call_agent(
         status=AgentStatus.RUNNING,
     )
 
-    try:
-        response = await _make_api_call(
-            client,
-            agent_id=agent_id,
-            model=settings.model,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            enable_thinking=settings.enable_thinking,
-            thinking_budget=settings.thinking_budget_tokens,
-        )
-    except anthropic.RateLimitError:
-        result.status = AgentStatus.ERROR
-        result.error = f"Rate limit: all {_MAX_RETRIES} retries exhausted"
-        return result
-    except anthropic.APIStatusError as exc:
-        result.status = AgentStatus.ERROR
-        result.error = f"API error ({exc.status_code}): {exc.message}"
-        return result
-    except anthropic.APIError as exc:
-        result.status = AgentStatus.ERROR
-        result.error = f"API error: {exc.message}"
-        return result
-    except Exception as exc:
-        result.status = AgentStatus.ERROR
-        result.error = f"Agent timed out or failed: {exc}"
-        return result
+    findings: list[Finding] = []
+    summary: str = ""
 
-    findings = _extract_findings(response.content, agent_id=agent_id, agent_name=agent_name)
-    summary = _extract_summary(response.content)
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = await _make_api_call(
+                client,
+                agent_id=agent_id,
+                model=settings.model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                enable_thinking=settings.enable_thinking,
+                thinking_budget=settings.thinking_budget_tokens,
+            )
+        except anthropic.RateLimitError:
+            result.status = AgentStatus.ERROR
+            result.error = f"Rate limit: all {_MAX_RETRIES} retries exhausted"
+            return result
+        except anthropic.APIStatusError as exc:
+            result.status = AgentStatus.ERROR
+            result.error = f"API error ({exc.status_code}): {exc.message}"
+            return result
+        except anthropic.APIError as exc:
+            result.status = AgentStatus.ERROR
+            result.error = f"API error: {exc.message}"
+            return result
+        except Exception as exc:
+            result.status = AgentStatus.ERROR
+            result.error = f"Agent timed out or failed: {exc}"
+            return result
+
+        findings = _extract_findings(response.content, agent_id=agent_id, agent_name=agent_name)
+        summary = _extract_summary(response.content)
+
+        if findings:
+            break
+
+        if attempt < _MAX_RETRIES:
+            delay = _RETRY_BASE_DELAY * (2.0**attempt)
+            logger.warning(
+                "[retry] %s — no tool call in response (stop_reason=%r); "
+                "retrying in %.0fs (attempt %d/%d)",
+                agent_id,
+                getattr(response, "stop_reason", "unknown"),
+                delay,
+                attempt + 1,
+                _MAX_RETRIES,
+            )
+            await asyncio.sleep(delay)
 
     if not findings:
         result.status = AgentStatus.ERROR

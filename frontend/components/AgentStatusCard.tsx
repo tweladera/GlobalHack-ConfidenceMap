@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AgentState } from "@/types";
 
 const BADGE_COLORS = {
@@ -12,11 +12,20 @@ const BADGE_COLORS = {
 interface AgentStatusCardProps {
   agents: AgentState[];
   completionOrder: string[];
+  agentStartTimes?: Record<string, number>;
 }
 
-export default function AgentStatusCard({ agents, completionOrder }: AgentStatusCardProps) {
+export default function AgentStatusCard({ agents, completionOrder, agentStartTimes = {} }: AgentStatusCardProps) {
   const [expandedThinking, setExpandedThinking] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
   const completedCount = agents.filter((a) => a.status === "completed").length;
+
+  useEffect(() => {
+    const hasRunning = agents.some((a) => a.status === "running");
+    if (!hasRunning) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [agents]);
   const total = agents.length;
 
   return (
@@ -90,10 +99,17 @@ export default function AgentStatusCard({ agents, completionOrder }: AgentStatus
                 </span>
                 <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                   {isRunning && (
-                    <span
-                      className="w-3 h-3 border border-accent/30 border-t-accent rounded-full animate-spin"
-                      aria-hidden="true"
-                    />
+                    <>
+                      <span
+                        className="w-3 h-3 border border-accent/30 border-t-accent rounded-full animate-spin"
+                        aria-hidden="true"
+                      />
+                      {agentStartTimes[agent.agent_id] && (
+                        <span className="text-[9px] font-mono text-accent/60">
+                          {Math.floor((now - agentStartTimes[agent.agent_id]) / 1000)}s
+                        </span>
+                      )}
+                    </>
                   )}
                   {isCompleted && rank >= 0 && (
                     <span className="text-[9px] font-mono text-slate-600">#{rank + 1}</span>

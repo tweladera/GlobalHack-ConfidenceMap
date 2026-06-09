@@ -61,6 +61,8 @@ export default function AnalysisPage() {
   const [hideRedundant, setHideRedundant] = useState(() => getConfig().autoHideRedundant);
   const [announcement, setAnnouncement] = useState("");
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [agentStartTimes, setAgentStartTimes] = useState<Record<string, number>>({});
+  const [analysisElapsed, setAnalysisElapsed] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,12 +74,18 @@ export default function AnalysisPage() {
     announceTimerRef.current = setTimeout(() => setAnnouncement(text), 60);
   };
 
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
   // Close export dropdown when clicking outside
   useEffect(() => {
     if (!showExportMenu) return;
-    const handler = () => setShowExportMenu(false);
-    window.addEventListener("click", handler, { capture: true, once: true });
-    return () => window.removeEventListener("click", handler, { capture: true });
+    const handler = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [showExportMenu]);
 
   // Keyboard shortcuts: Alt+1 Map · Alt+2 Table · Alt+3 Text · Alt+4 Heat Map
@@ -95,6 +103,16 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     setIsDemoMode(sessionStorage.getItem("demo_mode") === "true");
+  }, []);
+
+  // Global elapsed timer — starts immediately on mount, independent of SSE events
+  useEffect(() => {
+    const startTime = Date.now();
+    const id = setInterval(
+      () => setAnalysisElapsed(Math.floor((Date.now() - startTime) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -117,6 +135,7 @@ export default function AnalysisPage() {
       if (event.type === "agent_start" && event.agent_id) {
         const agentName = event.agent_name ?? event.agent_id;
         announce(`${agentName} has started analysis.`);
+        setAgentStartTimes((prev) => ({ ...prev, [event.agent_id!]: Date.now() }));
         setAgents((prev) =>
           prev.map((a) =>
             a.agent_id === event.agent_id ? { ...a, status: "running" } : a
@@ -218,6 +237,8 @@ export default function AnalysisPage() {
 
   const completedCount = agents.filter((a) => a.status === "completed").length;
   const progress = Math.round((completedCount / agents.length) * 100);
+  const formatElapsed = (s: number) =>
+    s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   const redundantAgentIds = useMemo(() => {
     if (!consolidationResult) return new Set<string>();
@@ -337,6 +358,9 @@ export default function AnalysisPage() {
           ) : (
             <span className="text-xs text-slate-500 font-mono">
               {t("analysis.progress", { completed: completedCount, total: agents.length })}
+              {analysisElapsed > 0 && (
+                <span className="ml-2 text-slate-600">· {formatElapsed(analysisElapsed)}</span>
+              )}
             </span>
           )}
         </div>
@@ -380,7 +404,7 @@ export default function AnalysisPage() {
         {isComplete && allFindings.length > 0 && (
           <div className="flex items-center gap-2">
             {/* Export dropdown */}
-            <div className="relative">
+            <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu((v) => !v)}
                 className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-slate-200 transition-colors font-mono flex items-center gap-1"
@@ -480,7 +504,7 @@ export default function AnalysisPage() {
           className="w-64 flex-shrink-0 border-r border-surface-border bg-surface-card overflow-y-auto p-4"
           aria-label="Agent status panel"
         >
-          <AgentStatusCard agents={agents} completionOrder={completionOrder} />
+          <AgentStatusCard agents={agents} completionOrder={completionOrder} agentStartTimes={agentStartTimes} />
 
           {/* Summaries per agent */}
           {agents.some((a) => a.summary) && (
@@ -667,7 +691,77 @@ export default function AnalysisPage() {
                   {t("analysis.timeout")}
                 </div>
               )}
-              <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} globalScore={globalScore} />
+              {allFindings.length === 0 && !isComplete ? (
+                <div className="flex flex-col items-center justify-center h-full gap-6 px-8" aria-live="polite" aria-label="Analysis in progress">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full border-2 border-accent/20 flex items-center justify-center">
+                        <div className="w-4 h-4 rounded-full bg-accent animate-pulse" />
+                      </div>
+                      <span className="absolute inset-0 rounded-full border-2 border-accent/30 animate-ping" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-200">Analyzing your specification</p>
+                      <p className="text-xs text-slate-500 mt-1 font-mono">
+                        {formatElapsed(analysisElapsed)} elapsed
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full max-w-sm space-y-2" role="list">
+                    {agents.map((agent) => {
+                      const isRunning = agent.status === "running";
+                      const isCompleted = agent.status === "completed";
+                      const isError = agent.status === "error";
+                      const elapsed = isRunning && agentStartTimes[agent.agent_id]
+                        ? Math.floor((Date.now() - agentStartTimes[agent.agent_id]) / 1000)
+                        : null;
+                      return (
+                        <div
+                          key={agent.agent_id}
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-colors ${
+                            isRunning
+                              ? "border-accent/40 bg-accent/5 text-accent"
+                              : isCompleted
+                              ? "border-confidence-green/30 bg-confidence-green-dim text-confidence-green"
+                              : isError
+                              ? "border-confidence-red/30 bg-confidence-red-dim text-confidence-red"
+                              : analysisElapsed > 0
+                              ? "border-slate-700 text-slate-500"
+                              : "border-surface-border text-slate-600"
+                          }`}
+                          role="listitem"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                isRunning ? "bg-accent animate-pulse" : isCompleted ? "bg-confidence-green" : isError ? "bg-confidence-red" : analysisElapsed > 0 ? "bg-slate-600 animate-pulse" : "bg-slate-700"
+                              }`}
+                              aria-hidden="true"
+                            />
+                            <span className="font-medium">{agent.agent_name}</span>
+                          </div>
+                          <span className="font-mono text-[10px] opacity-70">
+                            {isRunning && elapsed !== null
+                              ? `${elapsed}s`
+                              : isCompleted
+                              ? `${agent.findings.length} findings`
+                              : isError
+                              ? "error"
+                              : analysisElapsed > 0
+                              ? "in queue"
+                              : "waiting"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-slate-600 text-center font-mono">
+                    Findings will appear on the map as each agent completes
+                  </p>
+                </div>
+              ) : (
+                <ConfidenceMap agents={agents} onFindingSelect={setSelectedFinding} globalScore={globalScore} />
+              )}
             </>
           )}
         </div>}

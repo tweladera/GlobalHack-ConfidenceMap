@@ -21,7 +21,7 @@ from confidence_map.core.mock_results import AGENT_DELAYS, get_mock_consolidatio
 from confidence_map.core.settings import get_settings
 from confidence_map.models.analysis import AnalysisRequest, ConfidenceDistribution
 from confidence_map.models.events import SSEEvent, SSEEventType
-from confidence_map.models.findings import AgentResult, Finding
+from confidence_map.models.findings import AgentResult, AgentStatus, Finding
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,8 @@ async def stream_analysis(
 
     queue: asyncio.Queue[SSEEvent | None] = asyncio.Queue()
 
+    _AGENT_TIMEOUT = 180.0  # hard Python-level timeout per agent (asyncio cancellation)
+
     async def run(
         agent_module: _AgentModule,
         agent_id: str,
@@ -176,12 +178,25 @@ async def stream_analysis(
             await queue.put(
                 SSEEvent(type=SSEEventType.AGENT_START, agent_id=agent_id, agent_name=agent_name)
             )
-            result: AgentResult = await agent_module.run(
-                spec=request.spec,
-                architecture=request.architecture,
-                context=request.context,
-                spec_findings=spec_findings,
-            )
+            try:
+                result: AgentResult = await asyncio.wait_for(
+                    agent_module.run(
+                        spec=request.spec,
+                        architecture=request.architecture,
+                        context=request.context,
+                        spec_findings=spec_findings,
+                    ),
+                    timeout=_AGENT_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("%s AGENT_TIMEOUT %s after %.0fs", _ctx, agent_id, _AGENT_TIMEOUT)
+                result = AgentResult(
+                    agent_id=agent_id,
+                    agent_name=agent_name,
+                    agent_icon="AlertCircle",
+                    status=AgentStatus.ERROR,
+                    error=f"Agent timed out after {int(_AGENT_TIMEOUT)} seconds",
+                )
         # Semaphore released — next waiting agent can proceed
         elapsed = time.monotonic() - t0
         logger.info(
@@ -284,7 +299,7 @@ async def stream_analysis(
 
     try:
         while True:
-            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=130.0)
+            event: SSEEvent | None = await asyncio.wait_for(queue.get(), timeout=240.0)
             if event is None:
                 break
             logger.info("%s event=%s", _ctx, event.type)
@@ -304,7 +319,7 @@ async def stream_analysis(
             yield event
 
     except TimeoutError:
-        yield SSEEvent(type=SSEEventType.ERROR, error="Analysis timed out after 130 seconds")
+        yield SSEEvent(type=SSEEventType.ERROR, error="Analysis timed out after 240 seconds")
         return
     finally:
         if not task.done():
