@@ -1,209 +1,231 @@
 # Confidence Map — Frontend
 
-Interfaz web que visualiza el análisis multiagente en tiempo real mediante un mapa de confianza interactivo construido con React Flow.
+Web interface that visualizes multi-agent analysis in real time through an interactive confidence map built with React Flow.
 
 ---
 
-## Tecnologías
+## Technologies
 
-| Herramienta | Versión | Rol |
-|-------------|---------|-----|
-| Next.js | 15 (App Router) | Framework React |
-| TypeScript | 5 strict | Tipado estático |
-| React Flow | 11 | Visualización del mapa |
-| dagre | 1.1 | Layout automático del grafo |
-| Tailwind CSS | 3.4 | Estilos utilitarios |
-| Lucide React | 0.468 | Iconografía |
+| Tool | Version | Role |
+|------|---------|------|
+| Next.js | 15 (App Router) | React framework |
+| TypeScript | 5 strict | Static typing |
+| React Flow | 11 | Map visualization |
+| dagre | 1.1 | Automatic graph layout |
+| Tailwind CSS | 3.4 | Utility styles |
+| Lucide React | 0.468 | Icons |
 
 ---
 
-## Estructura
+## Structure
 
 ```
 frontend/
 ├── app/
-│   ├── layout.tsx          # Layout global + skip link de accesibilidad
-│   ├── page.tsx            # Página de inicio: input de especificación
-│   ├── globals.css         # Estilos base + overrides React Flow
+│   ├── layout.tsx          # Global layout + accessibility skip link
+│   ├── page.tsx            # Home page: spec input
+│   ├── globals.css         # Base styles + React Flow overrides
 │   └── analysis/
-│       └── page.tsx        # Dashboard de análisis con streaming SSE
+│       └── page.tsx        # Analysis dashboard with SSE streaming
+│       api/analyze/[id]/
+│           stream/route.ts # SSE Route Handler (bypasses Next.js buffering)
 ├── components/
-│   ├── ConfidenceMap.tsx   # React Flow: mapa visual central
-│   ├── AgentStatusCard.tsx # Panel lateral de estado de agentes
-│   ├── FindingDetail.tsx   # Panel de detalle al seleccionar un finding
-│   └── AccessibleSummary.tsx # Resumen textual + aria-live regions
+│   ├── ConfidenceMap.tsx   # React Flow: central visual map
+│   ├── AgentStatusCard.tsx # Left sidebar: agent status timeline
+│   ├── FindingDetail.tsx   # Detail panel for selected finding
+│   ├── DecisionTable.tsx   # Filterable findings table (Alt+2)
+│   ├── HeatMap.tsx         # 5×5 risk matrix (Alt+4)
+│   ├── BacklogModal.tsx    # JIRA-ready ticket generator
+│   ├── ChatPanel.tsx       # Inline AI chat sidebar
+│   └── AccessibleSummary.tsx # Text summary + aria-live regions
 ├── lib/
-│   └── demo-spec.ts        # PRD de demo: sistema de notificaciones de pagos
+│   ├── demo-spec.ts        # Demo specs: NovaBank Payments + Auth MFA
+│   ├── export.ts           # Markdown download + PDF report
+│   ├── history.ts          # localStorage analysis history
+│   └── config.ts           # User config (default view, etc.)
 ├── types/
-│   └── index.ts            # Tipos TypeScript compartidos + constantes de UI
+│   └── index.ts            # Shared TypeScript types + UI constants
 ├── next.config.ts          # Proxy /api/* → localhost:8000
-└── tailwind.config.ts      # Colores de confianza: green/yellow/red
+└── tailwind.config.ts      # Confidence color tokens: green/yellow/red
 ```
 
 ---
 
-## Instalación
+## Installation
 
-### Requisitos previos
-- Node.js 20+
-- pnpm 8+
+### Prerequisites
+- Node.js 22+
+- pnpm 10+
 
-### Instalar dependencias
+### Install dependencies
 
 ```bash
 cd frontend
 pnpm install --registry https://registry.npmjs.org
 ```
 
-> Si tu red usa un registry privado (Artifactory, etc.), el flag `--registry` apunta al registry público.
+> If your network uses a private registry (Artifactory, etc.), the `--registry` flag points to the public registry.
 
 ---
 
-## Ejecución
+## Running
 
 ```bash
-# Desarrollo
+# Development
 pnpm dev
 
-# Build de producción
+# Production build
 pnpm build
 pnpm start
 
-# Verificar tipos
+# Type check
 pnpm exec tsc --noEmit
 ```
 
-La app queda disponible en `http://localhost:3000`.
+App available at `http://localhost:3000`.
 
-**Requisito:** el backend debe estar corriendo en `http://localhost:8000`.
+**Requirement:** backend must be running at `http://localhost:8000`.
 
 ---
 
-## Páginas
+## Pages
 
-### `/` — Inicio
-- Textarea para pegar PRD, BRD o user stories
-- Campo opcional para arquitectura / ADRs
-- Botón **"Load demo"** carga un spec de ejemplo (sistema de notificaciones de pagos)
-- Vista previa de los 6 agentes disponibles
-- Accesibilidad: labels semánticos, error messages con `role="alert"`, skip link
+### `/` — Home
+- Textarea for pasting PRD, BRD, or user stories
+- Optional field for architecture / ADRs
+- **"NovaBank · Payments"** and **"NovaBank · Auth MFA"** preset buttons
+- Preview of the 6 available agents
+- Accessibility: semantic labels, error messages with `role="alert"`, skip link
 
 ### `/analysis` — Dashboard
-Layout de 3 columnas:
+3-column layout:
 
 ```
 ┌─────────────┬──────────────────────┬────────────────┐
-│   Sidebar   │    Confidence Map    │  Finding Panel │
-│   izquierdo │    (React Flow)      │    derecho     │
+│  Left       │    Confidence Map    │  Finding Panel │
+│  Sidebar    │    (React Flow)      │  (right)       │
 │             │                      │                │
-│  Agentes    │  Hub → Agentes →     │  Detalle del  │
-│  + estado   │  Findings (nodos     │  finding       │
-│  + resumen  │  color-coded)        │  seleccionado  │
+│  Agents     │  Hub → Agents →      │  Selected      │
+│  + status   │  Findings (color-    │  finding       │
+│  + summary  │  coded nodes)        │  detail        │
 └─────────────┴──────────────────────┴────────────────┘
 ```
 
+Header (post-analysis): **Export ▾** · **Backlog** · **Ask AI**
+
 ---
 
-## Componentes clave
+## Key Components
 
 ### `ConfidenceMap.tsx`
-- Construye el grafo React Flow en tiempo real a medida que llegan eventos SSE
-- Layout automático con dagre (TB: top-to-bottom)
-- Tres tipos de nodos: `hub`, `agent`, `finding`
-- Nodos `finding` son botones interactivos que disparan el panel de detalle
-- MiniMap para orientación en grafos grandes
+- Builds the React Flow graph in real time as SSE events arrive
+- Automatic layout with dagre (TB: top-to-bottom)
+- Three node types: `hub`, `agent`, `finding`
+- `finding` nodes are interactive buttons that open the detail panel
+- MiniMap for orientation in large graphs
+
+### `AgentStatusCard.tsx`
+- Timeline with status dot per agent (pending / running / completed / error)
+- Elapsed seconds counter next to the spinner for running agents
+- Mini confidence distribution badges (green/yellow/red) when completed
+- "Show reasoning" toggle when `ENABLE_THINKING=true`
 
 ### `AccessibleSummary.tsx`
-- `aria-live="polite"` que narra el progreso para lectores de pantalla
-- Panel de texto colapsable con conteo por nivel de confianza
-- Summaries narrativos de cada agente completado
-- Diseño inclusivo: toda información visual existe también en texto
+- `aria-live="polite"` narrates progress for screen readers
+- Collapsible text panel with count per confidence level
+- Narrative summaries from each completed agent
+- Inclusive design: all visual information also available as text
 
 ### `FindingDetail.tsx`
-- Barra de progreso con `role="progressbar"` y `aria-valuenow`
-- Secciones: descripción, evidencia (blockquote), asunciones, validaciones pendientes
-- Badge del agente y categoría del finding
+- Progress bar with `role="progressbar"` and `aria-valuenow`
+- Sections: description, evidence (blockquote), assumptions, pending validations
+- Agent badge and finding category
 
 ---
 
-## Flujo de datos
+## Data Flow
 
 ```
-Usuario ingresa spec
+User submits spec
         │
         ▼
 POST /api/analyze → {analysis_id}
         │
         ▼
-Redirect a /analysis
+Redirect to /analysis
         │
         ▼
-EventSource /api/analyze/{id}/stream
+EventSource /api/analyze/{id}/stream  ← Route Handler (no buffering)
         │
-        ├── agent_start    → agente pasa a "running" (pulsa)
-        ├── agent_complete → nodos del mapa aparecen con sus findings
-        └── analysis_complete → barra de progreso llega al 100%
+        ├── agent_start    → agent transitions to "running" (pulsing dot)
+        ├── agent_complete → map nodes appear with their findings
+        └── analysis_complete → progress bar reaches 100%
 ```
+
+### SSE Streaming Architecture
+`next.config.ts` rewrites buffer SSE responses. The Route Handler at
+`app/api/analyze/[id]/stream/route.ts` bypasses this by piping the upstream
+`ReadableStream` directly to the client with `no-cache, no-transform` headers.
 
 ---
 
-## Proxy al backend
+## Backend Proxy
 
-`next.config.ts` re-dirige todas las llamadas `/api/*` al backend:
+`next.config.ts` redirects all `/api/*` calls to the backend:
 
 ```ts
 // next.config.ts
 rewrites: [{ source: "/api/:path*", destination: "http://localhost:8000/api/:path*" }]
 ```
 
-No se necesita configurar CORS en el frontend.
+SSE stream uses the Route Handler directly — no CORS configuration needed in the frontend.
 
 ---
 
-## Paleta de colores
+## Color Palette
 
-| Token | Color | Uso |
-|-------|-------|-----|
-| `confidence-green` | `#22c55e` | Findings explícitamente definidos |
-| `confidence-yellow` | `#eab308` | Findings inferidos |
-| `confidence-red` | `#ef4444` | Findings con alta incertidumbre |
-| `accent` | `#6366f1` | Nodo hub, botones primarios, agentes activos |
-| `surface` | `#0d0d1a` | Fondo principal |
-| `surface-card` | `#13131f` | Cards y sidebars |
-
----
-
-## Accesibilidad
-
-El frontend implementa WCAG 2.1 AA como requisito, no como feature:
-
-- **Skip link** visible al hacer Tab en la página: "Skip to main content"
-- **`aria-live="polite"`** en `AccessibleSummary` narra el progreso en tiempo real
-- **`aria-busy`** en el botón de análisis mientras carga
-- **`role="alert"`** para mensajes de error
-- **`role="progressbar"`** con `aria-valuenow` en la barra de progreso y confidence scores
-- **`role="region"`** con etiquetas en cada panel
-- **`aria-current`** en el finding seleccionado en la lista
-- **`prefers-reduced-motion`** respetado en CSS (animaciones desactivadas)
-- Navegación por teclado completa: Tab, Enter, Space
-- Contraste: todos los textos cumplen ratio 4.5:1 mínimo
+| Token | Color | Usage |
+|-------|-------|-------|
+| `confidence-green` | `#22c55e` | Explicitly defined findings |
+| `confidence-yellow` | `#eab308` | Inferred findings |
+| `confidence-red` | `#ef4444` | High-uncertainty findings |
+| `accent` | `#6366f1` | Hub node, primary buttons, active agents |
+| `surface` | `#0d0d1a` | Main background |
+| `surface-card` | `#13131f` | Cards and sidebars |
 
 ---
 
-## Variables de entorno
+## Accessibility
 
-El frontend no requiere variables de entorno en desarrollo. En producción:
+The frontend implements WCAG 2.1 AA as a requirement, not a feature:
 
-| Variable | Descripción |
+- **Skip link** visible on Tab: "Skip to main content"
+- **`aria-live="polite"`** in `AccessibleSummary` narrates progress in real time
+- **`aria-busy`** on the analysis button while loading
+- **`role="alert"`** for error messages
+- **`role="progressbar"`** with `aria-valuenow` on progress bars and confidence scores
+- **`role="region"`** with labels on each panel
+- **`aria-current`** on the selected finding in the list
+- **`prefers-reduced-motion`** respected in CSS (animations disabled)
+- Full keyboard navigation: Tab, Enter, Space
+- Contrast: all text meets minimum 4.5:1 ratio
+
+---
+
+## Environment Variables
+
+The frontend requires no environment variables in development. In production:
+
+| Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_API_URL` | URL del backend (si no se usa el proxy de Next.js) |
+| `NEXT_PUBLIC_API_URL` | Backend URL (if not using the Next.js proxy) |
 
 ---
 
-## Build y despliegue
+## Build and Deploy
 
 ```bash
 pnpm build
-# Output estático en .next/
-# Deploy en Vercel, Netlify, o cualquier servidor Node.js
+# Static output in .next/
+# Deploy on Vercel, Netlify, or any Node.js server
 ```

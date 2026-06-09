@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — main · 2026-06-09
+
+### Fixed — Backend
+- **Ruff N806/UP041**: moved `_AGENT_TIMEOUT` to module scope; replaced `asyncio.TimeoutError`
+  with builtin `TimeoutError`
+- **Per-agent timeout**: `asyncio.wait_for(180s)` per agent prevents full-analysis hang;
+  orchestrator consumer timeout raised to 240s
+- **Retry on empty tool_use**: outer retry loop in `call_agent()` when model returns no findings
+  (exponential backoff: 1s/2s, max 2 retries); non-thinking API call timeout reduced to 80s
+
+### Fixed — Frontend
+- **SSE real-time streaming**: Next.js `rewrites()` buffers SSE responses; added Route Handler
+  at `app/api/analyze/[id]/stream/route.ts` that pipes upstream `ReadableStream` directly with
+  `no-cache, no-transform` headers — agents now show real-time status changes
+- **Export dropdown**: replaced `window.addEventListener("click", { capture: true })` with
+  ref-based `mousedown` outside-click detection — Markdown and PDF exports now work correctly
+
+### Added — Frontend UX
+- **Global elapsed timer**: starts from component mount (not first agent event); shows as `M:SS`
+  in the analysis header next to the agent progress counter
+- **Canvas placeholder**: shows agent queue status during analysis (in queue / Xs elapsed /
+  N findings / error) before the first finding arrives; transitions to React Flow map automatically
+- **Per-agent elapsed time**: seconds counter next to the spinner for each running agent
+
+### Changed — CI / Docs
+- GitHub Actions reverted to stable versions: `checkout@v4`, `setup-node@v4`, `setup-uv@v5`
+- `docs/` fully translated to English; HTML diagram files removed (replaced by Markdown)
+- `docs/architecture-novabank-pagos.md` renamed to `docs/architecture-novabank-payments.md`
+- `frontend/README.md` translated to English
+- Test count updated: 94 tests · 89.84% coverage
+
+---
+
 ## [Unreleased] — feat/shared-blackboard (merged to main)
 
 ### Added — Backend

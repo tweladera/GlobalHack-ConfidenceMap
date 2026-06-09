@@ -128,7 +128,7 @@ confidence-map/
 │   │   ├── core/          # orchestrator.py, mock_results.py, settings.py
 │   │   └── models/        # Pydantic v2: analysis, events, findings, chat
 │   ├── evals/             # Golden spec evaluation framework (make eval)
-│   ├── tests/             # 81 tests · 87.94% coverage
+│   ├── tests/             # 94 tests · 89.84% coverage
 │   └── pyproject.toml     # uv · mypy --strict · ruff · pytest
 ├── frontend/
 │   ├── app/               # Next.js App Router (page.tsx, analysis/page.tsx)
@@ -141,6 +141,16 @@ confidence-map/
 ├── CHANGELOG.md           # Version history
 └── AGENTS.md              # AI assistant instructions for this repo
 ```
+
+---
+
+## Architecture Diagrams
+
+| Diagram | Description |
+|---------|-------------|
+| [Harness Engineering](./docs/diagram-harness-engineering.md) | End-to-end system architecture and component relationships |
+| [LLM as a Judge](./docs/diagram-llm-as-a-judge.md) | How the Consolidator cross-audits agent findings |
+| [Spec to Data Pipelines](./docs/diagram-spec-to-data-pipelines.md) | Data flow from spec input to confidence map output |
 
 ---
 
@@ -186,7 +196,7 @@ Open `http://localhost:3000`, select a preset spec, click **Run Analysis**.
 | Backend | Python 3.12, FastAPI, uv |
 | AI | Anthropic SDK, Claude Sonnet 4.6, structured tool use |
 | Type safety | mypy --strict, Pydantic v2 |
-| Tests | pytest, pytest-asyncio, 81 tests, 87.94% coverage |
+| Tests | pytest, pytest-asyncio, 94 tests, 89.84% coverage |
 | Frontend | Next.js 15, TypeScript strict, pnpm 10 |
 | Visualization | React Flow, dagre auto-layout |
 | Styles | Tailwind CSS |
@@ -210,7 +220,7 @@ Open `http://localhost:3000`, select a preset spec, click **Run Analysis**.
 
 ```bash
 make check    # ruff + mypy + pytest + tsc — all gates must pass
-make test     # pytest only (81 tests, ≥80% coverage required)
+make test     # pytest only (94 tests, ≥80% coverage required)
 make eval     # golden spec evaluations (requires real API key)
 make stop     # kill processes on :8000 and :3000
 ```

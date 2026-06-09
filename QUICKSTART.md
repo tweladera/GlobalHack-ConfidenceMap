@@ -65,7 +65,7 @@ FRONTEND_URL=http://localhost:3000
 ```bash
 uv sync
 ANTHROPIC_API_KEY=test uv run pytest --no-header -q
-# → 81 passed, coverage 87.94%
+# → 94 passed, coverage 89.84%
 
 uv run uvicorn confidence_map.main:app --reload
 # → http://localhost:8000/health
