@@ -128,7 +128,7 @@ confidence-map/
 │   │   ├── core/          # orchestrator.py, mock_results.py, settings.py
 │   │   └── models/        # Pydantic v2: analysis, events, findings, chat
 │   ├── evals/             # Golden spec evaluation framework (make eval)
-│   ├── tests/             # 94 tests · 89.84% coverage
+│   ├── tests/             # 94 tests · 90% coverage
 │   └── pyproject.toml     # uv · mypy --strict · ruff · pytest
 ├── frontend/
 │   ├── app/               # Next.js App Router (page.tsx, analysis/page.tsx)
@@ -137,6 +137,7 @@ confidence-map/
 │   ├── lib/               # demo-spec.ts, export.ts, history.ts, i18n.tsx
 │   ├── messages/          # en.json (English only)
 │   └── types/index.ts     # Shared TypeScript types
+├── docs/                  # Architecture diagrams · Hackathon presentation (HTML + PDF)
 ├── QUICKSTART.md          # Setup guide (under 10 minutes)
 ├── CHANGELOG.md           # Version history
 └── AGENTS.md              # AI assistant instructions for this repo
@@ -151,6 +152,15 @@ confidence-map/
 | [Harness Engineering](./docs/diagram-harness-engineering.md) | End-to-end system architecture and component relationships |
 | [LLM as a Judge](./docs/diagram-llm-as-a-judge.md) | How the Consolidator cross-audits agent findings |
 | [Spec to Data Pipelines](./docs/diagram-spec-to-data-pipelines.md) | Data flow from spec input to confidence map output |
+
+---
+
+## Hackathon Submission
+
+| Asset | Format | Description |
+|-------|--------|-------------|
+| [Presentation](./docs/Confidence-Map-Presentation.html) | HTML | Slide deck — Thoughtworks brand guidelines, 6 slides |
+| [Presentation](./docs/Confidence-Map-Presentation.pdf) | PDF | Same deck, print-ready PDF |
 
 ---
 
@@ -230,7 +240,7 @@ make stop     # kill processes on :8000 and :3000
 ```bash
 cd backend && uv run ruff check confidence_map/           # 0 errors
 cd backend && uv run mypy --strict confidence_map/        # 0 errors
-cd backend && ANTHROPIC_API_KEY=test uv run pytest -q     # 81 passed
+cd backend && ANTHROPIC_API_KEY=test uv run pytest -q     # 94 passed
 cd frontend && pnpm exec tsc --noEmit                     # no output = ok
 ```
 

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@700&family=Inter:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+/* ── TW Brand tokens ── */
+:root {
+  --wave-blue:    #005566;
+  --flamingo:     #f2617a;
+  --jade:         #5a9068;
+  --sapphire:     #1d8ba0;
+  --amethyst:     #634e8e;
+  --turmeric:     #c9a227;
+  --mist:         #f0f2f4;
+  --onyx:         #1a1a1a;
+  --white:        #ffffff;
+  --body-grey:    #444444;
+  --light-border: #e2e6ea;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+@page { size: 1280px 720px; margin: 0; }
+
+body { margin: 0; padding: 0; background: #fff; font-family: 'Inter', sans-serif; }
+
+/* ── SLIDE BASE ── */
+.slide {
+  width: 1280px; height: 720px;
+  position: relative; overflow: hidden;
+  page-break-after: always;
+  display: flex; flex-direction: column;
+}
+
+/* ── TW FOOTER (all slides) ── */
+.tw-footer {
+  position: absolute; bottom: 18px; left: 48px; right: 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'Inter', sans-serif; font-size: 12px;
+}
+.tw-footer-dark { color: rgba(255,255,255,0.45); }
+.tw-footer-light { color: #9ca3af; }
+
+/* ── TW LOGO (/thoughtworks) ── */
+.tw-logo {
+  position: absolute; bottom: 52px; left: 48px;
+  display: flex; align-items: center; gap: 0;
+  font-family: 'Inter', sans-serif; font-weight: 600; font-size: 18px;
+}
+.tw-logo .slash { color: var(--flamingo); font-weight: 700; }
+.tw-logo .name-dark { color: var(--white); }
+.tw-logo .name-light { color: var(--onyx); }
+
+
+/* ══════════════════════════════════════════
+   SLIDE 1 — COVER  (Wave blue background)
+══════════════════════════════════════════ */
+.s1 { background: var(--wave-blue); }
+
+.s1 .content {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; padding: 0 80px 120px;
+}
+.s1 .eyebrow {
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(255,255,255,0.55); margin-bottom: 20px;
+}
+.s1 h1 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 88px; line-height: 1.0;
+  color: var(--white); margin-bottom: 20px;
+}
+.s1 .tagline {
+  font-family: 'Inter', sans-serif; font-size: 26px; font-weight: 400;
+  color: var(--flamingo);
+}
+.s1 .team-line {
+  position: absolute; top: 44px; right: 48px;
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400;
+  color: rgba(255,255,255,0.5);
+}
+
+
+/* ══════════════════════════════════════════
+   SLIDE 2 — THE PROBLEM  (White)
+══════════════════════════════════════════ */
+.s2 { background: var(--white); }
+
+.s2 .top {
+  padding: 48px 80px 0;
+}
+.s2 h2 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 48px; color: var(--onyx); line-height: 1.1;
+}
+.s2 .sub {
+  font-family: 'Inter', sans-serif; font-size: 17px; color: #666;
+  margin-top: 8px;
+}
+.s2 .body {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px; padding: 28px 80px 70px;
+  align-items: start;
+}
+.pain-list { display: flex; flex-direction: column; gap: 18px; }
+.pain-item {
+  display: flex; gap: 16px; align-items: flex-start;
+  border-left: 3px solid var(--flamingo);
+  padding: 16px 20px; background: var(--mist); border-radius: 0 10px 10px 0;
+}
+.pain-item .icon { font-size: 24px; flex-shrink: 0; margin-top: 1px; }
+.pain-item h4 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 15px; color: var(--onyx); margin-bottom: 4px;
+}
+.pain-item p {
+  font-family: 'Inter', sans-serif; font-size: 14px;
+  color: var(--body-grey); line-height: 1.5;
+}
+.s2 .right { display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+.insight-box {
+  border: 2px solid var(--light-border);
+  border-left: 4px solid var(--wave-blue);
+  border-radius: 0 12px 12px 0;
+  padding: 22px 24px;
+}
+.insight-box p {
+  font-family: 'Inter', sans-serif; font-size: 15px;
+  color: var(--body-grey); line-height: 1.7;
+}
+.insight-box strong { color: var(--onyx); }
+.callout-big {
+  background: var(--wave-blue);
+  border-radius: 12px; padding: 28px 28px;
+  color: var(--white);
+}
+.callout-big .label {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.55); margin-bottom: 10px;
+}
+.callout-big p {
+  font-family: 'Inter', sans-serif; font-size: 16px;
+  font-weight: 400; line-height: 1.6; color: rgba(255,255,255,0.9);
+}
+.callout-big em { color: var(--flamingo); font-style: normal; font-weight: 700; }
+
+
+/* ══════════════════════════════════════════
+   SLIDE 3 — 6 AGENTS  (White)
+══════════════════════════════════════════ */
+.s3 { background: var(--white); }
+
+.s3 .top { padding: 44px 80px 0; }
+.s3 h2 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 48px; color: var(--onyx);
+}
+.s3 .sub {
+  font-family: 'Inter', sans-serif; font-size: 16px;
+  color: #666; margin-top: 6px;
+}
+.s3 .diagram-area {
+  flex: 1; display: flex;
+  justify-content: center; align-items: center;
+  padding: 8px 48px 68px;
+}
+
+
+/* ══════════════════════════════════════════
+   SLIDE 4 — TOOL IN ACTION  (White)
+══════════════════════════════════════════ */
+.s4 { background: var(--white); }
+
+.s4 .top { padding: 44px 80px 12px; }
+.s4 h2 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 48px; color: var(--onyx);
+}
+.s4 .sub {
+  font-family: 'Inter', sans-serif; font-size: 16px;
+  color: #666; margin-top: 6px;
+}
+.s4 .body {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 36px; padding: 0 80px 68px;
+  align-items: center;
+}
+.s4 .left { display: flex; flex-direction: column; gap: 14px; }
+.legend-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px; background: var(--mist); border-radius: 8px;
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.dot-g { background: #22c55e; }
+.dot-y { background: #f59e0b; }
+.dot-r { background: #ef4444; }
+.legend-item span {
+  font-family: 'Inter', sans-serif; font-size: 14px; color: var(--body-grey);
+}
+.legend-item strong { color: var(--onyx); }
+.score-bar {
+  background: var(--wave-blue); border-radius: 10px;
+  padding: 18px 22px; color: var(--white);
+  display: flex; align-items: center; gap: 18px; margin-top: 4px;
+}
+.score-bar .num {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 44px; color: var(--flamingo); line-height: 1;
+}
+.score-bar .desc {
+  font-family: 'Inter', sans-serif; font-size: 13px;
+  color: rgba(255,255,255,0.75); line-height: 1.5;
+}
+.critical-box {
+  background: #fff5f5; border-radius: 8px; padding: 14px 16px;
+  border-left: 3px solid #ef4444;
+}
+.critical-box .label {
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: #b91c1c; margin-bottom: 4px;
+}
+.critical-box p {
+  font-family: 'Inter', sans-serif; font-size: 13px;
+  color: #7f1d1d; line-height: 1.5;
+}
+.s4 .right { display: flex; justify-content: center; align-items: center; }
+
+
+/* ══════════════════════════════════════════
+   SLIDE 5 — THREE CHALLENGES  (White)
+══════════════════════════════════════════ */
+.s5 { background: var(--white); }
+
+.s5 .top { padding: 44px 80px 20px; }
+.s5 h2 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 48px; color: var(--onyx);
+}
+.s5 .sub {
+  font-family: 'Inter', sans-serif; font-size: 16px;
+  color: #666; margin-top: 6px;
+}
+.s5 .cards {
+  flex: 1; display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 24px; padding: 0 80px 68px; align-items: stretch;
+}
+.area-card {
+  border-radius: 12px; padding: 28px 24px;
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--mist);
+  border-top: 4px solid transparent;
+}
+.area-card:nth-child(1) { border-top-color: var(--flamingo); }
+.area-card:nth-child(2) { border-top-color: var(--sapphire); }
+.area-card:nth-child(3) { border-top-color: var(--amethyst); }
+.area-card .a-icon { font-size: 28px; }
+.area-card h3 {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 18px; color: var(--onyx);
+}
+.area-card p {
+  font-family: 'Inter', sans-serif; font-size: 13.5px;
+  color: var(--body-grey); line-height: 1.6; flex: 1;
+}
+.area-card .pill {
+  display: inline-block; background: var(--white);
+  border-radius: 20px; padding: 4px 12px;
+  font-family: 'Inter', sans-serif; font-size: 11px;
+  font-weight: 600; color: #555; width: fit-content; margin-top: 4px;
+}
+
+
+/* ══════════════════════════════════════════
+   SLIDE 6 — CLOSING  (Wave blue)
+══════════════════════════════════════════ */
+.s6 { background: var(--wave-blue); justify-content: center; align-items: center; }
+
+.s6 .inner {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 28px;
+  padding: 0 100px 80px; text-align: center;
+}
+.s6 .eyebrow {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+}
+.s6 .quote {
+  font-family: 'Bitter', serif; font-weight: 700;
+  font-size: 54px; color: var(--white); line-height: 1.15;
+}
+.s6 .quote em { color: var(--flamingo); font-style: normal; }
+.s6 .rule { width: 56px; height: 3px; background: var(--flamingo); border-radius: 2px; }
+.s6 .tagline {
+  font-family: 'Inter', sans-serif; font-size: 20px;
+  font-weight: 400; color: rgba(255,255,255,0.75);
+}
+.s6 .team {
+  font-family: 'Inter', sans-serif; font-size: 15px;
+  color: rgba(255,255,255,0.5);
+}
+.s6 .badges { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.badge {
+  background: rgba(255,255,255,0.1); border-radius: 20px;
+  padding: 5px 14px; font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.65);
+}
+</style>
+</head>
+<body>
+
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 1 — COVER
+════════════════════════════════════════════ -->
+<div class="slide s1">
+  <div class="team-line">Evans Ladera &amp; Daniel Santibanez</div>
+
+  <div class="content">
+    <div class="eyebrow">Hackathon — AI/Works™ 2026</div>
+    <h1>Confidence map</h1>
+    <div class="tagline">Visible reasoning for confident delivery</div>
+  </div>
+
+  <!-- /thoughtworks logo -->
+  <div class="tw-logo">
+    <span class="slash">/</span>
+    <span class="name-dark">thoughtworks</span>
+  </div>
+
+  <div class="tw-footer tw-footer-dark">
+    <span>© 2026 Thoughtworks&nbsp;&nbsp;|&nbsp;&nbsp;Confidential</span>
+    <span></span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 2 — THE PROBLEM
+════════════════════════════════════════════ -->
+<div class="slide s2">
+  <div class="top">
+    <h2>The invisible risk in software delivery</h2>
+    <div class="sub">Engineering teams don't fail for lack of tools — they fail because uncertainty stays hidden</div>
+  </div>
+  <div class="body">
+    <div class="pain-list">
+      <div class="pain-item">
+        <div class="icon">🔍</div>
+        <div>
+          <h4>Ambiguous specifications</h4>
+          <p>Teams start building from specs that contain hidden gaps, contradictions, and assumptions — without knowing it.</p>
+        </div>
+      </div>
+      <div class="pain-item">
+        <div class="icon">🏗️</div>
+        <div>
+          <h4>Blind architectural decisions</h4>
+          <p>SLAs are committed, infrastructure is chosen, timelines are set — without validating feasibility against real constraints.</p>
+        </div>
+      </div>
+      <div class="pain-item">
+        <div class="icon">💸</div>
+        <div>
+          <h4>Late discovery is expensive</h4>
+          <p>A risk found in production is a sprint lost, an incident, or a component that excludes users — none of it visible at design time.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="insight-box">
+        <p>Current AI tools — Copilot, ChatGPT, Cursor — <strong>generate answers</strong> but do not make uncertainty visible. They don't show what they're assuming. They produce output; they don't expose the reasoning.</p>
+      </div>
+      <div class="callout-big">
+        <div class="label">The gap</div>
+        <p>No tool today tells a team <em>what it doesn't know</em> before the first line of code is written.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tw-footer tw-footer-light">
+    <span>© 2026 Thoughtworks&nbsp;&nbsp;|&nbsp;&nbsp;Confidential</span>
+    <span>2</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 3 — SIX AGENTS
+════════════════════════════════════════════ -->
+<div class="slide s3">
+  <div class="top">
+    <h2>Six specialized agents. One system.</h2>
+    <div class="sub">Each agent reasons independently — a consolidator acts as a neutral LLM-as-a-Judge across all outputs</div>
+  </div>
+  <div class="diagram-area">
+    <!-- Cards: 6 × h=60, gap=68 top-to-top, start y=8 → last bottom=408 ✓
+         Card width=200px → text area 440→592 = 152px (fits "Accessibility advocate") -->
+    <svg viewBox="0 0 1120 415" width="1120" height="415" font-family="Inter,sans-serif">
+      <defs>
+        <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#c0c8d0"/>
+        </marker>
+      </defs>
+
+      <!-- INPUT — centered on y=208 -->
+      <rect x="4" y="153" width="138" height="110" rx="10" fill="#f0f2f4" stroke="#d1d8e0" stroke-width="1.5"/>
+      <text x="73" y="194" text-anchor="middle" font-size="10" fill="#888" font-weight="600" letter-spacing="0.05em">INPUT</text>
+      <text x="73" y="213" text-anchor="middle" font-size="13" fill="#1a1a1a" font-weight="700">PRD /</text>
+      <text x="73" y="230" text-anchor="middle" font-size="13" fill="#1a1a1a" font-weight="700">User stories</text>
+      <text x="73" y="248" text-anchor="middle" font-size="11" fill="#9ca3af">Any spec</text>
+
+      <!-- Arrow input → orchestrator -->
+      <line x1="142" y1="208" x2="192" y2="208" stroke="#c0c8d0" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- ORCHESTRATOR — y=167..249, center=208 -->
+      <rect x="192" y="167" width="126" height="82" rx="10" fill="#005566"/>
+      <text x="255" y="196" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)" font-weight="600" letter-spacing="0.05em">ORCHESTRATOR</text>
+      <text x="255" y="215" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">Phase 1</text>
+      <text x="255" y="232" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.6)">6 agents · parallel</text>
+
+      <!-- Arrows orch→agents: right edge x=318, y spread 177→237 (step 12) -->
+      <line x1="318" y1="177" x2="392" y2="38"  stroke="#c0c8d0" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <line x1="318" y1="189" x2="392" y2="106" stroke="#c0c8d0" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <line x1="318" y1="201" x2="392" y2="174" stroke="#c0c8d0" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <line x1="318" y1="213" x2="392" y2="242" stroke="#c0c8d0" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <line x1="318" y1="225" x2="392" y2="310" stroke="#c0c8d0" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <line x1="318" y1="237" x2="392" y2="378" stroke="#c0c8d0" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+      <!-- AGENT CARDS — x=392, w=200, tops: 8,76,144,212,280,348 | centers: 38,106,174,242,310,378 -->
+
+      <!-- Spec analyst  y=8, cy=38 -->
+      <rect x="392" y="8"   width="200" height="60" rx="8" fill="#fff" stroke="#e2e6ea" stroke-width="1.5"/>
+      <circle cx="418" cy="38" r="13" fill="#f2617a"/>
+      <text x="418" y="43" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">SA</text>
+      <text x="440" y="32" font-size="12" fill="#1a1a1a" font-weight="700">Spec analyst</text>
+      <text x="440" y="49" font-size="11" fill="#888">Requirements integrity</text>
+
+      <!-- Arch validator  y=76, cy=106 -->
+      <rect x="392" y="76"  width="200" height="60" rx="8" fill="#fff" stroke="#e2e6ea" stroke-width="1.5"/>
+      <circle cx="418" cy="106" r="13" fill="#1d8ba0"/>
+      <text x="418" y="111" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">AV</text>
+      <text x="440" y="100" font-size="12" fill="#1a1a1a" font-weight="700">Arch validator</text>
+      <text x="440" y="117" font-size="11" fill="#888">Design &amp; scalability</text>
+
+      <!-- Risk intelligence  y=144, cy=174 -->
+      <rect x="392" y="144" width="200" height="60" rx="8" fill="#fff" stroke="#e2e6ea" stroke-width="1.5"/>
+      <circle cx="418" cy="174" r="13" fill="#dc2626"/>
+      <text x="418" y="179" text-anchor="middle" font-size="9"  fill="#fff" font-weight="700">RI</text>
+      <text x="440" y="168" font-size="12" fill="#1a1a1a" font-weight="700">Risk intelligence</text>
+      <text x="440" y="185" font-size="11" fill="#888">Security &amp; operations</text>
+
+      <!-- Business impact  y=212, cy=242 -->
+      <rect x="392" y="212" width="200" height="60" rx="8" fill="#fff" stroke="#e2e6ea" stroke-width="1.5"/>
+      <circle cx="418" cy="242" r="13" fill="#5a9068"/>
+      <text x="418" y="247" text-anchor="middle" font-size="9"  fill="#fff" font-weight="700">BI</text>
+      <text x="440" y="236" font-size="12" fill="#1a1a1a" font-weight="700">Business impact</text>
+      <text x="440" y="253" font-size="11" fill="#888">Cost &amp; delivery outcomes</text>
+
+      <!-- Accessibility advocate  y=280, cy=310 -->
+      <rect x="392" y="280" width="200" height="60" rx="8" fill="#fff" stroke="#e2e6ea" stroke-width="1.5"/>
+      <circle cx="418" cy="310" r="13" fill="#c9a227"/>
+      <text x="418" y="315" text-anchor="middle" font-size="9"  fill="#fff" font-weight="700">AA</text>
+      <text x="440" y="304" font-size="12" fill="#1a1a1a" font-weight="700">Accessibility advocate</text>
+      <text x="440" y="321" font-size="11" fill="#888">Inclusion &amp; compliance</text>
+
+      <!-- Delivery historian  y=348, cy=378, bottom=408 ✓ -->
+      <rect x="392" y="348" width="200" height="60" rx="8" fill="#fff" stroke="#e2e6ea" stroke-width="1.5"/>
+      <circle cx="418" cy="378" r="13" fill="#634e8e"/>
+      <text x="418" y="383" text-anchor="middle" font-size="9"  fill="#fff" font-weight="700">DH</text>
+      <text x="440" y="372" font-size="12" fill="#1a1a1a" font-weight="700">Delivery historian</text>
+      <text x="440" y="389" font-size="11" fill="#888">Pattern &amp; precedent</text>
+
+      <!-- Arrows agents→consolidator: right edge x=592 -->
+      <line x1="592" y1="38"  x2="650" y2="194" stroke="#c0c8d0" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="592" y1="106" x2="650" y2="201" stroke="#c0c8d0" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="592" y1="174" x2="650" y2="208" stroke="#c0c8d0" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="592" y1="242" x2="650" y2="215" stroke="#c0c8d0" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="592" y1="310" x2="650" y2="222" stroke="#c0c8d0" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="592" y1="378" x2="650" y2="229" stroke="#c0c8d0" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- CONSOLIDATOR — center y=208 -->
+      <rect x="650" y="160" width="134" height="96" rx="10" fill="#005566"/>
+      <text x="717" y="189" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)" font-weight="600" letter-spacing="0.04em">CONSOLIDATOR</text>
+      <text x="717" y="210" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">LLM-as-a</text>
+      <text x="717" y="228" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">Judge</text>
+      <text x="717" y="246" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.5)">Phase 2</text>
+
+      <!-- Arrow consolidator → output -->
+      <line x1="784" y1="208" x2="856" y2="208" stroke="#c0c8d0" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- OUTPUT -->
+      <rect x="856" y="144" width="226" height="120" rx="10" fill="#fff" stroke="#005566" stroke-width="2"/>
+      <text x="969" y="171" text-anchor="middle" font-size="10" fill="#888" font-weight="600" letter-spacing="0.05em">OUTPUT</text>
+      <text x="969" y="191" text-anchor="middle" font-size="14" fill="#1a1a1a" font-weight="700">Confidence map</text>
+      <line x1="876" y1="199" x2="1062" y2="199" stroke="#e2e6ea" stroke-width="1"/>
+      <text x="882" y="218" font-size="12" fill="#555">● Structured findings</text>
+      <text x="882" y="236" font-size="12" fill="#555">● Risk heat map (5×5)</text>
+      <text x="882" y="254" font-size="12" fill="#555">● JIRA-ready backlog</text>
+    </svg>
+  </div>
+
+  <div class="tw-footer tw-footer-light">
+    <span>© 2026 Thoughtworks&nbsp;&nbsp;|&nbsp;&nbsp;Confidential</span>
+    <span>3</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 4 — TOOL IN ACTION
+════════════════════════════════════════════ -->
+<div class="slide s4">
+  <div class="top">
+    <h2>The tool in action</h2>
+    <div class="sub">NovaBank · International payments — real output from the analysis engine</div>
+  </div>
+  <div class="body">
+    <div class="left">
+      <div class="legend-item">
+        <div class="dot dot-g"></div>
+        <span><strong>Green:</strong> Explicitly defined in the specification — safe to implement</span>
+      </div>
+      <div class="legend-item">
+        <div class="dot dot-y"></div>
+        <span><strong>Yellow:</strong> Reasonably inferred — validate before building</span>
+      </div>
+      <div class="legend-item">
+        <div class="dot dot-r"></div>
+        <span><strong>Red:</strong> High uncertainty — do not implement without clarification</span>
+      </div>
+      <div class="score-bar">
+        <div class="num">22%</div>
+        <div class="desc">Global confidence score<br/>The spec needs at least<br/>one more refinement pass</div>
+      </div>
+      <div class="critical-box">
+        <div class="label">⚠ Top critical finding</div>
+        <p>"SLA contradiction: 2 s target vs synchronous legacy gateway with undefined latency"</p>
+      </div>
+    </div>
+    <div class="right">
+      <!-- Node map SVG mockup with TW colors -->
+      <svg viewBox="0 0 510 430" width="510" height="430" font-family="Inter,sans-serif">
+        <rect x="0" y="0" width="510" height="430" rx="14" fill="#f0f2f4" stroke="#d1d8e0" stroke-width="1.5"/>
+        <text x="16" y="24" font-size="10" fill="#9ca3af" font-weight="600" letter-spacing="0.06em">CONFIDENCE MAP — NODE VIEW</text>
+
+        <!-- Hub -->
+        <circle cx="255" cy="218" r="52" fill="#005566" stroke="#004455" stroke-width="1.5"/>
+        <text x="255" y="208" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)" font-weight="600">NovaBank</text>
+        <text x="255" y="224" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)">Payments</text>
+        <text x="255" y="244" text-anchor="middle" font-size="20" fill="#f2617a" font-weight="700">22%</text>
+
+        <!-- Edges -->
+        <line x1="206" y1="198" x2="118" y2="125" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="205" y1="212" x2="108" y2="218" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="212" y1="248" x2="128" y2="330" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="255" y1="166" x2="255" y2="78" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="304" y1="198" x2="392" y2="125" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="307" y1="218" x2="405" y2="218" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="298" y1="248" x2="378" y2="338" stroke="#c0c8d0" stroke-width="1.5"/>
+        <line x1="244" y1="268" x2="196" y2="382" stroke="#c0c8d0" stroke-width="1.5"/>
+
+        <!-- Red nodes -->
+        <circle cx="118" cy="115" r="34" fill="#fff0f0" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="118" y="108" text-anchor="middle" font-size="9" fill="#b91c1c" font-weight="700">CoreBanking</text>
+        <text x="118" y="121" text-anchor="middle" font-size="9" fill="#b91c1c">Timeout</text>
+        <text x="118" y="136" text-anchor="middle" font-size="13" fill="#ef4444" font-weight="700">8%</text>
+
+        <circle cx="392" cy="115" r="34" fill="#fff0f0" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="392" y="108" text-anchor="middle" font-size="9" fill="#b91c1c" font-weight="700">SLA</text>
+        <text x="392" y="121" text-anchor="middle" font-size="9" fill="#b91c1c">Contradiction</text>
+        <text x="392" y="136" text-anchor="middle" font-size="13" fill="#ef4444" font-weight="700">12%</text>
+
+        <circle cx="196" cy="388" r="30" fill="#fff0f0" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="196" y="383" text-anchor="middle" font-size="9" fill="#b91c1c" font-weight="700">Idempotency</text>
+        <text x="196" y="396" text-anchor="middle" font-size="9" fill="#b91c1c">gap</text>
+        <text x="196" y="410" text-anchor="middle" font-size="11" fill="#ef4444" font-weight="700">15%</text>
+
+        <!-- Yellow nodes -->
+        <circle cx="108" cy="218" r="30" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
+        <text x="108" y="212" text-anchor="middle" font-size="9" fill="#92400e" font-weight="700">Retry</text>
+        <text x="108" y="225" text-anchor="middle" font-size="9" fill="#92400e">Strategy</text>
+        <text x="108" y="238" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="700">45%</text>
+
+        <circle cx="255" cy="62" r="28" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
+        <text x="255" y="56" text-anchor="middle" font-size="9" fill="#92400e" font-weight="700">FX rate</text>
+        <text x="255" y="69" text-anchor="middle" font-size="9" fill="#92400e">source</text>
+        <text x="255" y="82" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="700">52%</text>
+
+        <circle cx="382" cy="342" r="28" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/>
+        <text x="382" y="336" text-anchor="middle" font-size="9" fill="#92400e" font-weight="700">Notif.</text>
+        <text x="382" y="349" text-anchor="middle" font-size="9" fill="#92400e">channel</text>
+        <text x="382" y="362" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="700">48%</text>
+
+        <!-- Green nodes -->
+        <circle cx="128" cy="334" r="28" fill="#f0fdf4" stroke="#22c55e" stroke-width="2"/>
+        <text x="128" y="328" text-anchor="middle" font-size="9" fill="#166534" font-weight="700">Auth</text>
+        <text x="128" y="341" text-anchor="middle" font-size="9" fill="#166534">flow</text>
+        <text x="128" y="354" text-anchor="middle" font-size="11" fill="#22c55e" font-weight="700">85%</text>
+
+        <circle cx="410" cy="218" r="28" fill="#f0fdf4" stroke="#22c55e" stroke-width="2"/>
+        <text x="410" y="212" text-anchor="middle" font-size="9" fill="#166534" font-weight="700">Currency</text>
+        <text x="410" y="225" text-anchor="middle" font-size="9" fill="#166534">validation</text>
+        <text x="410" y="238" text-anchor="middle" font-size="11" fill="#22c55e" font-weight="700">78%</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="tw-footer tw-footer-light">
+    <span>© 2026 Thoughtworks&nbsp;&nbsp;|&nbsp;&nbsp;Confidential</span>
+    <span>4</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 5 — THREE CHALLENGES
+════════════════════════════════════════════ -->
+<div class="slide s5">
+  <div class="top">
+    <h2>Three hackathon challenges. One platform.</h2>
+    <div class="sub">Confidence Map was designed to address all three areas directly</div>
+  </div>
+  <div class="cards">
+    <div class="area-card">
+      <div class="a-icon">🔄</div>
+      <h3>Spec-to-Data Pipelines</h3>
+      <p>Unstructured PRDs and user stories are transformed into structured, queryable findings with explicit confidence levels, categories, and recommended actions — ready for JIRA or any downstream tool.</p>
+      <div class="pill">Structured · Traceable · Actionable</div>
+    </div>
+    <div class="area-card">
+      <div class="a-icon">⚖️</div>
+      <h3>LLM-as-a-Judge</h3>
+      <p>Six specialized agents act as independent evaluators of different domains. A consolidator agent then acts as a neutral second-opinion judge across all outputs — eliminating single-model bias.</p>
+      <div class="pill">6 agents · 1 consolidator · Bias-free</div>
+    </div>
+    <div class="area-card">
+      <div class="a-icon">🛡️</div>
+      <h3>Harness engineering</h3>
+      <p>Phased orchestration with concurrency control, per-finding guardrails that validate output quality, TTL-based result store, correlation IDs for full traceability, and real-time SSE streaming — all running on Claude.</p>
+      <div class="pill">Retry · Guardrails · Observability</div>
+    </div>
+  </div>
+
+  <div class="tw-footer tw-footer-light">
+    <span>© 2026 Thoughtworks&nbsp;&nbsp;|&nbsp;&nbsp;Confidential</span>
+    <span>5</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 6 — CLOSING  (Wave blue)
+════════════════════════════════════════════ -->
+<div class="slide s6">
+  <div class="inner">
+    <div class="eyebrow">Confidence Map · Hackathon AI/works™ 2026</div>
+    <div class="quote">
+      "It's not QA of the code.<br/>
+      It's <em>QA of the idea.</em>"
+    </div>
+    <div class="rule"></div>
+    <div class="tagline">Visible reasoning for confident delivery</div>
+    <div class="team">Evans Ladera &amp; Daniel Santibanez · Thoughtworks</div>
+    <div class="badges">
+      <span class="badge">Python 3.12 · FastAPI</span>
+      <span class="badge">Next.js 15 · React Flow</span>
+      <span class="badge">Claude Sonnet 4.6</span>
+      <span class="badge">6 AI agents</span>
+      <span class="badge">94 tests · 90% coverage</span>
+    </div>
+  </div>
+
+  <!-- /thoughtworks logo -->
+  <div class="tw-logo">
+    <span class="slash">/</span>
+    <span class="name-dark">thoughtworks</span>
+  </div>
+
+  <div class="tw-footer tw-footer-dark">
+    <span>© 2026 Thoughtworks&nbsp;&nbsp;|&nbsp;&nbsp;Confidential</span>
+    <span>6</span>
+  </div>
+</div>
+
+
+</body>
+</html>

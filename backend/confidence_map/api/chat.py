@@ -20,20 +20,15 @@ router = APIRouter(prefix="/api", tags=["chat"])
 _MAX_FINDINGS_IN_PROMPT = 20
 
 _DEMO_RESPONSE = (
-    "Based on this analysis, here are the key insights.\n\n"
-    "The findings reveal a complex risk landscape. Critical items (marked red) "
-    "indicate areas where the specification lacks explicit definition — these "
-    "should be resolved before implementation begins.\n\n"
-    "I recommend the following approach:\n"
-    "1. **Address the critical findings first** — schedule a refinement session "
-    "focused on resolving high-uncertainty items.\n"
-    "2. **Make implicit decisions explicit** — update the specification to document "
-    "the assumptions identified by the agents.\n"
-    "3. **Prioritize architectural decisions** that would block parallel work streams.\n\n"
-    "A confidence score below 60% typically means the spec needs at least one more "
-    "refinement pass before it is implementation-ready. The goal is to move red "
-    "findings to yellow (inferred) or green (confirmed) through deliberate "
-    "clarification work."
+    "The most critical risk is the **SLA contradiction** flagged by the Architecture Validator.\n\n"
+    "The spec requires a 2-second response time, but the proposed architecture relies on a "
+    "synchronous call to a legacy payment gateway with no documented latency SLA. "
+    "These two constraints are incompatible — and no one has made that decision explicitly yet.\n\n"
+    "Fix this before writing a single line of code:\n"
+    "1. Define the gateway's actual p99 latency with the vendor.\n"
+    "2. Decide: async processing with a callback, or a different gateway.\n\n"
+    "The **idempotency gap** in the retry strategy is a close second — "
+    "duplicate payments are a production incident waiting to happen."
 )
 
 
